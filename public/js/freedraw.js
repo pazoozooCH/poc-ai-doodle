@@ -170,10 +170,9 @@ async function getCustomScores(tensor) {
     const sims = data.samples.map(s => cosineSimilarity(features, s));
     const avgSim = sims.reduce((a, b) => a + b, 0) / sims.length;
     const maxSim = Math.max(...sims);
-    // Use max similarity (best matching sample) for scoring
-    // Within-category similarity ~0.85-0.90, across-category ~0.5
-    // Map 0.75-0.95 to 0-1
-    const score = Math.max(0, Math.min(1, (maxSim - 0.75) / 0.2));
+    // Sigmoid mapping centered around 0.82 — gives gradual ramp-up
+    // instead of sudden 0% -> 50% jump with linear mapping
+    const score = 1 / (1 + Math.exp(-20 * (maxSim - 0.82)));
     merged.push({ label: name + ' *', prob: score });
     details.push({ name, avgSim, maxSim, score, numSamples: data.samples.length });
   }

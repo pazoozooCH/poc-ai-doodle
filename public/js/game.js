@@ -188,9 +188,8 @@ async function classify() {
     for (const [name, data] of Object.entries(customCategories)) {
       if (!data.samples || data.samples.length === 0) continue;
       const avgSim = data.samples.reduce((sum, s) => sum + cosineSimilarity(features, s), 0) / data.samples.length;
-      // Within-category similarity ~0.85-0.90, across-category ~0.5
-      // Map 0.75-0.95 to 0-1
-      const score = Math.max(0, Math.min(1, (avgSim - 0.75) / 0.2));
+      // Sigmoid mapping centered around 0.82
+      const score = 1 / (1 + Math.exp(-20 * (avgSim - 0.82)));
       results.push({ label: name + ' *', prob: score });
     }
   }
