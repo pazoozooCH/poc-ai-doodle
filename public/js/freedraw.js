@@ -234,24 +234,73 @@ function renderPixelsToCanvas(pixels) {
   ctx.putImageData(imgData, 0, 0);
 }
 
-function drawStrokeOnPixels(pixels, startX, startY, length, angle) {
-  // Draw a short line on the 28x28 pixel grid
+function mutatePixels(pixels) {
   const result = new Float32Array(pixels);
-  for (let i = 0; i <= length; i++) {
-    const x = Math.round(startX + Math.cos(angle) * i);
-    const y = Math.round(startY + Math.sin(angle) * i);
-    // Draw a 2px brush
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const px = x + dx;
-        const py = y + dy;
-        if (px >= 0 && px < 28 && py >= 0 && py < 28) {
-          result[py * 28 + px] = Math.min(1, result[py * 28 + px] + 0.8);
+  const action = Math.random();
+
+  if (action < 0.4) {
+    // Small stroke (1-3px long, 1px brush)
+    const sx = Math.floor(Math.random() * 28);
+    const sy = Math.floor(Math.random() * 28);
+    const len = Math.floor(Math.random() * 3) + 1;
+    const angle = Math.random() * Math.PI * 2;
+    for (let i = 0; i <= len; i++) {
+      const x = Math.round(sx + Math.cos(angle) * i);
+      const y = Math.round(sy + Math.sin(angle) * i);
+      if (x >= 0 && x < 28 && y >= 0 && y < 28) {
+        result[y * 28 + x] = 1;
+      }
+    }
+  } else if (action < 0.65) {
+    // Erase a small area (1-3px)
+    const sx = Math.floor(Math.random() * 28);
+    const sy = Math.floor(Math.random() * 28);
+    const len = Math.floor(Math.random() * 3) + 1;
+    const angle = Math.random() * Math.PI * 2;
+    for (let i = 0; i <= len; i++) {
+      const x = Math.round(sx + Math.cos(angle) * i);
+      const y = Math.round(sy + Math.sin(angle) * i);
+      if (x >= 0 && x < 28 && y >= 0 && y < 28) {
+        result[y * 28 + x] = 0;
+      }
+    }
+  } else if (action < 0.85) {
+    // Toggle a single pixel
+    const x = Math.floor(Math.random() * 28);
+    const y = Math.floor(Math.random() * 28);
+    result[y * 28 + x] = result[y * 28 + x] > 0.5 ? 0 : 1;
+  } else {
+    // Nudge a small 3x3 patch (shift ink slightly)
+    const cx = Math.floor(Math.random() * 26) + 1;
+    const cy = Math.floor(Math.random() * 26) + 1;
+    const dx = Math.floor(Math.random() * 3) - 1;
+    const dy = Math.floor(Math.random() * 3) - 1;
+    for (let py = -1; py <= 1; py++) {
+      for (let px = -1; px <= 1; px++) {
+        const srcX = cx + px, srcY = cy + py;
+        const dstX = srcX + dx, dstY = srcY + dy;
+        if (dstX >= 0 && dstX < 28 && dstY >= 0 && dstY < 28) {
+          result[dstY * 28 + dstX] = pixels[srcY * 28 + srcX];
         }
       }
     }
   }
   return result;
+}
+
+function updatePredictions(probs) {
+  const results = LABELS.map((label, i) => ({ label, prob: probs[i] }))
+    .sort((a, b) => b.prob - a.prob);
+  document.getElementById('top-prediction').textContent =
+    `${results[0].label} (${(results[0].prob * 100).toFixed(0)}%)`;
+  const container = document.getElementById('predictions');
+  container.innerHTML = results.slice(0, 5).map(r => {
+    const pct = (r.prob * 100).toFixed(0);
+    const hue = Math.round(r.prob * 120);
+    const bg = `hsl(${hue}, 70%, 30%)`;
+    const color = `hsl(${hue}, 80%, 80%)`;
+    return `<span class="prediction-tag" style="background:${bg};color:${color}">${r.label} ${pct}%</span>`;
+  }).join('');
 }
 
 async function aiDraw() {
@@ -273,47 +322,33 @@ async function aiDraw() {
 
   let pixels = new Float32Array(28 * 28);
   let bestProb = 0;
+  let bestProbs = null;
   let iteration = 0;
+  let accepted = 0;
 
   while (aiDrawing) {
-    // Try a random stroke
-    const sx = Math.random() * 26 + 1;
-    const sy = Math.random() * 26 + 1;
-    const len = Math.random() * 6 + 2;
-    const angle = Math.random() * Math.PI * 2;
-
-    const candidate = drawStrokeOnPixels(pixels, sx, sy, len, angle);
+    const candidate = mutatePixels(pixels);
     const probs = await classifyRaw(candidate);
 
     if (probs[targetIdx] > bestProb) {
       pixels = candidate;
       bestProb = probs[targetIdx];
+      bestProbs = probs;
+      accepted++;
       renderPixelsToCanvas(pixels);
+      updatePredictions(bestProbs);
     }
 
     iteration++;
-    if (iteration % 5 === 0) {
-      statusEl.textContent = `Iteration ${iteration} — ${cat}: ${(bestProb * 100).toFixed(1)}%`;
-      // Update predictions display
-      const results = LABELS.map((label, i) => ({ label, prob: probs[i] }))
-        .sort((a, b) => b.prob - a.prob);
-      document.getElementById('top-prediction').textContent =
-        `${results[0].label} (${(results[0].prob * 100).toFixed(0)}%)`;
-      const container = document.getElementById('predictions');
-      container.innerHTML = results.slice(0, 5).map(r => {
-        const pct = (r.prob * 100).toFixed(0);
-        const hue = Math.round(r.prob * 120);
-        const bg = `hsl(${hue}, 70%, 30%)`;
-        const color = `hsl(${hue}, 80%, 80%)`;
-        return `<span class="prediction-tag" style="background:${bg};color:${color}">${r.label} ${pct}%</span>`;
-      }).join('');
+    if (iteration % 10 === 0) {
+      statusEl.textContent = `Iteration ${iteration} — ${cat}: ${(bestProb * 100).toFixed(1)}% (${accepted} accepted)`;
     }
 
     // Yield to browser
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 0));
 
     if (bestProb > 0.95) {
-      statusEl.textContent = `Done! ${cat}: ${(bestProb * 100).toFixed(1)}% after ${iteration} iterations`;
+      statusEl.textContent = `Done! ${cat}: ${(bestProb * 100).toFixed(1)}% after ${iteration} iterations (${accepted} accepted)`;
       break;
     }
   }
