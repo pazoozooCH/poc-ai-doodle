@@ -276,54 +276,82 @@ function updateGallery(pixels, prob, cat) {
   }).join('');
 }
 
-function mutatePixels(pixels) {
+// Draw a line on 28x28 pixel grid with given brush size
+function drawLine(pixels, sx, sy, len, angle, val, brush) {
   const result = new Float32Array(pixels);
-  const action = Math.random();
-
-  if (action < 0.4) {
-    // Small stroke (1-3px long, 1px brush)
-    const sx = Math.floor(Math.random() * 28);
-    const sy = Math.floor(Math.random() * 28);
-    const len = Math.floor(Math.random() * 3) + 1;
-    const angle = Math.random() * Math.PI * 2;
-    for (let i = 0; i <= len; i++) {
-      const x = Math.round(sx + Math.cos(angle) * i);
-      const y = Math.round(sy + Math.sin(angle) * i);
-      if (x >= 0 && x < 28 && y >= 0 && y < 28) {
-        result[y * 28 + x] = 1;
-      }
-    }
-  } else if (action < 0.65) {
-    // Erase a small area (1-3px)
-    const sx = Math.floor(Math.random() * 28);
-    const sy = Math.floor(Math.random() * 28);
-    const len = Math.floor(Math.random() * 3) + 1;
-    const angle = Math.random() * Math.PI * 2;
-    for (let i = 0; i <= len; i++) {
-      const x = Math.round(sx + Math.cos(angle) * i);
-      const y = Math.round(sy + Math.sin(angle) * i);
-      if (x >= 0 && x < 28 && y >= 0 && y < 28) {
-        result[y * 28 + x] = 0;
-      }
-    }
-  } else if (action < 0.85) {
-    // Toggle a single pixel
-    const x = Math.floor(Math.random() * 28);
-    const y = Math.floor(Math.random() * 28);
-    result[y * 28 + x] = result[y * 28 + x] > 0.5 ? 0 : 1;
-  } else {
-    // Nudge a small 3x3 patch (shift ink slightly)
-    const cx = Math.floor(Math.random() * 26) + 1;
-    const cy = Math.floor(Math.random() * 26) + 1;
-    const dx = Math.floor(Math.random() * 3) - 1;
-    const dy = Math.floor(Math.random() * 3) - 1;
-    for (let py = -1; py <= 1; py++) {
-      for (let px = -1; px <= 1; px++) {
-        const srcX = cx + px, srcY = cy + py;
-        const dstX = srcX + dx, dstY = srcY + dy;
-        if (dstX >= 0 && dstX < 28 && dstY >= 0 && dstY < 28) {
-          result[dstY * 28 + dstX] = pixels[srcY * 28 + srcX];
+  for (let i = 0; i <= len; i++) {
+    const cx = Math.round(sx + Math.cos(angle) * i);
+    const cy = Math.round(sy + Math.sin(angle) * i);
+    for (let dy = -brush; dy <= brush; dy++) {
+      for (let dx = -brush; dx <= brush; dx++) {
+        const px = cx + dx, py = cy + dy;
+        if (px >= 0 && px < 28 && py >= 0 && py < 28) {
+          result[py * 28 + px] = val;
         }
+      }
+    }
+  }
+  return result;
+}
+
+function mutatePixels(pixels, intensity) {
+  // intensity 0-1 controls how bold the mutations are
+  // Higher early on, lower as we refine
+  const result = new Float32Array(pixels);
+  const numMutations = Math.ceil(1 + intensity * 3); // 1-4 mutations at once
+
+  for (let m = 0; m < numMutations; m++) {
+    const action = Math.random();
+    const maxLen = Math.floor(2 + intensity * 10); // 2-12px strokes
+    const brush = Math.random() < intensity ? 1 : 0; // thicker brush when intense
+
+    if (action < 0.35) {
+      // Draw stroke
+      const sx = Math.floor(Math.random() * 28);
+      const sy = Math.floor(Math.random() * 28);
+      const len = Math.floor(Math.random() * maxLen) + 1;
+      const angle = Math.random() * Math.PI * 2;
+      const drawn = drawLine(result, sx, sy, len, angle, 1, brush);
+      for (let i = 0; i < 784; i++) result[i] = drawn[i];
+    } else if (action < 0.6) {
+      // Erase stroke
+      const sx = Math.floor(Math.random() * 28);
+      const sy = Math.floor(Math.random() * 28);
+      const len = Math.floor(Math.random() * maxLen) + 1;
+      const angle = Math.random() * Math.PI * 2;
+      const erased = drawLine(result, sx, sy, len, angle, 0, brush);
+      for (let i = 0; i < 784; i++) result[i] = erased[i];
+    } else if (action < 0.75) {
+      // Flip a random rectangular patch
+      const w = Math.floor(Math.random() * (3 + intensity * 5)) + 1;
+      const h = Math.floor(Math.random() * (3 + intensity * 5)) + 1;
+      const ox = Math.floor(Math.random() * (28 - w));
+      const oy = Math.floor(Math.random() * (28 - h));
+      for (let y = oy; y < oy + h; y++) {
+        for (let x = ox; x < ox + w; x++) {
+          result[y * 28 + x] = result[y * 28 + x] > 0.5 ? 0 : 1;
+        }
+      }
+    } else if (action < 0.9) {
+      // Shift entire image by 1-2px in a random direction
+      const dx = Math.floor(Math.random() * 3) - 1;
+      const dy = Math.floor(Math.random() * 3) - 1;
+      const copy = new Float32Array(784);
+      for (let y = 0; y < 28; y++) {
+        for (let x = 0; x < 28; x++) {
+          const srcX = x - dx, srcY = y - dy;
+          if (srcX >= 0 && srcX < 28 && srcY >= 0 && srcY < 28) {
+            copy[y * 28 + x] = result[srcY * 28 + srcX];
+          }
+        }
+      }
+      for (let i = 0; i < 784; i++) result[i] = copy[i];
+    } else {
+      // Scatter: randomly toggle several pixels
+      const count = Math.floor(5 + intensity * 20);
+      for (let i = 0; i < count; i++) {
+        const idx = Math.floor(Math.random() * 784);
+        result[idx] = result[idx] > 0.5 ? 0 : 1;
       }
     }
   }
@@ -367,37 +395,80 @@ async function aiDraw() {
   document.getElementById('ai-gallery').innerHTML = '';
 
   let pixels = new Float32Array(28 * 28);
-  let bestProb = 0;
-  let bestProbs = null;
+  let currentProb = 0;
+  let globalBestPixels = new Float32Array(28 * 28);
+  let globalBestProb = 0;
   let iteration = 0;
   let accepted = 0;
+  let stuckCount = 0;
 
-  while (aiDrawing) {
-    const candidate = mutatePixels(pixels);
+  // Simulated annealing: start hot (accept bad moves), cool down
+  const MAX_ITER = 5000;
+
+  while (aiDrawing && iteration < MAX_ITER) {
+    const temperature = Math.max(0.01, 1 - iteration / MAX_ITER);
+    // intensity controls mutation size: bold early, fine later
+    const intensity = Math.max(0.1, temperature);
+
+    const candidate = mutatePixels(pixels, intensity);
     const probs = await classifyRaw(candidate);
+    const candidateProb = probs[targetIdx];
 
-    if (probs[targetIdx] > bestProb) {
+    // Accept if better, or probabilistically if worse (simulated annealing)
+    const delta = candidateProb - currentProb;
+    const acceptWorse = Math.random() < Math.exp(delta * 10 / temperature);
+
+    if (delta > 0 || acceptWorse) {
       pixels = candidate;
-      bestProb = probs[targetIdx];
-      bestProbs = probs;
+      currentProb = candidateProb;
       accepted++;
+
+      if (currentProb > globalBestProb) {
+        globalBestPixels = new Float32Array(pixels);
+        globalBestProb = currentProb;
+        stuckCount = 0;
+        updateGallery(pixels, globalBestProb, cat);
+      }
+
       renderPixelsToCanvas(pixels);
-      updatePredictions(bestProbs);
-      updateGallery(pixels, bestProb, cat);
+      updatePredictions(probs);
+    }
+
+    stuckCount++;
+
+    // If stuck for too long, restart from global best with a shake-up
+    if (stuckCount > 200) {
+      pixels = new Float32Array(globalBestPixels);
+      currentProb = globalBestProb;
+      // Apply a big random mutation to escape
+      pixels = mutatePixels(pixels, 0.8);
+      const resetProbs = await classifyRaw(pixels);
+      currentProb = resetProbs[targetIdx];
+      stuckCount = 0;
     }
 
     iteration++;
-    if (iteration % 10 === 0) {
-      statusEl.textContent = `Iteration ${iteration} — ${cat}: ${(bestProb * 100).toFixed(1)}% (${accepted} accepted)`;
+    if (iteration % 5 === 0) {
+      statusEl.textContent = `Iteration ${iteration}/${MAX_ITER} — ${cat}: ${(globalBestProb * 100).toFixed(1)}% (temp: ${temperature.toFixed(2)})`;
+      // Yield to browser every 5 iterations
+      await new Promise(r => setTimeout(r, 0));
     }
 
-    // Yield to browser
-    await new Promise(r => setTimeout(r, 0));
-
-    if (bestProb > 0.95) {
-      statusEl.textContent = `Done! ${cat}: ${(bestProb * 100).toFixed(1)}% after ${iteration} iterations (${accepted} accepted)`;
+    if (globalBestProb > 0.95) {
+      // Show the global best on canvas
+      renderPixelsToCanvas(globalBestPixels);
+      const finalProbs = await classifyRaw(globalBestPixels);
+      updatePredictions(finalProbs);
+      statusEl.textContent = `Done! ${cat}: ${(globalBestProb * 100).toFixed(1)}% after ${iteration} iterations`;
       break;
     }
+  }
+
+  // Make sure we end showing the best result
+  if (globalBestProb > currentProb) {
+    renderPixelsToCanvas(globalBestPixels);
+    const finalProbs = await classifyRaw(globalBestPixels);
+    updatePredictions(finalProbs);
   }
 
   aiDrawing = false;
