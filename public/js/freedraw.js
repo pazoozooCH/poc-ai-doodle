@@ -153,11 +153,15 @@ async function classify() {
   document.getElementById('top-prediction').textContent =
     `${results[0].label} (${(results[0].prob * 100).toFixed(0)}%)`;
 
-  // Show top 5
+  // Show top 5 with red-yellow-green coloring
   const container = document.getElementById('predictions');
   container.innerHTML = results.slice(0, 5).map(r => {
     const pct = (r.prob * 100).toFixed(0);
-    return `<span class="prediction-tag">${r.label} ${pct}%</span>`;
+    // 0% -> red (0), 50% -> yellow (60), 100% -> green (120)
+    const hue = Math.round(r.prob * 120);
+    const bg = `hsl(${hue}, 70%, 30%)`;
+    const color = `hsl(${hue}, 80%, 80%)`;
+    return `<span class="prediction-tag" style="background:${bg};color:${color}">${r.label} ${pct}%</span>`;
   }).join('');
 }
 
