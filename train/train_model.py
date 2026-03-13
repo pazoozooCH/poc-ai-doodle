@@ -51,6 +51,23 @@ class DoodleCNN(nn.Module):
         return x
 
 
+class DoodleFeatureExtractor(nn.Module):
+    """Extracts the 128-dim feature vector from the penultimate layer."""
+    def __init__(self, full_model):
+        super().__init__()
+        self.features = full_model.features
+        self.flatten = nn.Flatten()
+        self.fc = full_model.classifier[2]   # Linear(128*3*3, 128)
+        self.relu = full_model.classifier[3]  # ReLU
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.flatten(x)
+        x = self.fc(x)
+        x = self.relu(x)
+        return x
+
+
 def download_data():
     os.makedirs(DATA_DIR, exist_ok=True)
     all_x, all_y = [], []
@@ -141,7 +158,18 @@ def main():
         dynamic_axes={'input': {0: 'batch'}, 'output': {0: 'batch'}},
     )
 
-    print('\nStep 4: Exporting sample images...')
+    print('\nStep 4: Exporting feature extractor...')
+    feat_model = DoodleFeatureExtractor(model)
+    feat_model.eval()
+    torch.onnx.export(
+        feat_model, dummy,
+        os.path.join(MODEL_DIR, 'feature_extractor.onnx'),
+        input_names=['input'],
+        output_names=['features'],
+        dynamic_axes={'input': {0: 'batch'}, 'features': {0: 'batch'}},
+    )
+
+    print('\nStep 5: Exporting sample images...')
     export_samples()
 
     print('\nDone! Model saved. Start the server with: node server.js')

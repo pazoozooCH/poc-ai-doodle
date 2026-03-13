@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Doodle Challenge - Train Custom Categories</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="loading" class="model-loading">
+    <div class="spinner"></div>
+    <p>Loading feature extractor...</p>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="game-header">
+      <a href="/" style="color:#888;text-decoration:none">Back</a>
+      <span>Train Custom Categories</span>
+    </div>
+
+    <div style="padding:20px;text-align:center">
+      <div style="display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-bottom:15px">
+        <input type="text" id="new-category" placeholder="New category name" maxlength="30" style="padding:10px 15px;border-radius:12px;background:#16213e;color:#eee;border:2px solid #333;font-size:1rem;width:200px">
+        <button id="btn-add-category" style="padding:10px 20px;border:none;border-radius:12px;background:#e94560;color:white;font-weight:600;cursor:pointer">Add Category</button>
+      </div>
+
+      <div id="category-section" style="display:none">
+        <div style="margin-bottom:10px;color:#888">
+          Drawing for: <strong id="current-category" style="color:#e94560"></strong>
+          <span id="sample-count" style="color:#666"></span>
+        </div>
+
+        <div class="canvas-wrapper">
+          <canvas id="canvas" width="280" height="280"></canvas>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:10px">
+          <button id="btn-add-sample" style="padding:10px 25px;border:none;border-radius:12px;background:#2ecc71;color:white;font-weight:600;cursor:pointer">Add Sample</button>
+          <button class="btn-clear" id="btn-clear">Clear</button>
+          <img id="debug-preview" width="56" height="56" style="border:1px solid #333;border-radius:4px;image-rendering:pixelated;display:none" title="What the model sees">
+        </div>
+
+        <div id="samples-grid" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:15px"></div>
+      </div>
+    </div>
+
+    <div style="padding:0 20px 20px;border-top:1px solid #222;margin-top:10px">
+      <div style="color:#888;text-align:center;margin:15px 0">All Custom Categories (shared with all players)</div>
+      <div id="categories-list"></div>
+      <div id="no-categories" style="text-align:center;color:#555">No custom categories yet. Add one above!</div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <script src="/js/train.js"></script>
+</body>
+</html>

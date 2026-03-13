@@ -6,11 +6,17 @@ const LABELS = [
 ];
 
 let model = null;
+let featureModel = null;
 let samplesData = null;
+let customCategories = {};
 let isDrawing = false;
 let hasStrokes = false;
 let classifyInterval = null;
 let aiDrawing = false;
+
+const socket = io();
+socket.on('custom-categories', (cats) => { customCategories = cats; });
+socket.emit('get-custom-categories');
 
 // Canvas setup
 const canvas = document.getElementById('canvas');
@@ -142,6 +148,31 @@ function softmax(arr) {
   return exps.map(x => x / sum);
 }
 
+function cosineSimilarity(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB) + 1e-8);
+}
+
+async function getCustomScores(tensor) {
+  if (!featureModel || Object.keys(customCategories).length === 0) return [];
+  const featOutput = await featureModel.run({ input: tensor });
+  const features = Array.from(featOutput.features.data);
+
+  const results = [];
+  for (const [name, data] of Object.entries(customCategories)) {
+    if (!data.samples || data.samples.length === 0) continue;
+    const avgSim = data.samples.reduce((sum, s) => sum + cosineSimilarity(features, s), 0) / data.samples.length;
+    const score = Math.max(0, (avgSim - 0.3) / 0.7);
+    results.push({ label: name + ' *', prob: score });
+  }
+  return results;
+}
+
 async function classifyRaw(inputArray) {
   const tensor = new ort.Tensor('float32', inputArray, [1, 1, 28, 28]);
   const output = await model.run({ input: tensor });
@@ -157,8 +188,13 @@ async function classify() {
   const logits = Array.from(output.output.data);
   const probs = softmax(logits);
 
-  const results = LABELS.map((label, i) => ({ label, prob: probs[i] }))
-    .sort((a, b) => b.prob - a.prob);
+  let results = LABELS.map((label, i) => ({ label, prob: probs[i] }));
+
+  // Merge custom categories
+  const customScores = await getCustomScores(tensor);
+  results = results.concat(customScores);
+
+  results.sort((a, b) => b.prob - a.prob);
 
   document.getElementById('top-prediction').textContent =
     `${results[0].label} (${(results[0].prob * 100).toFixed(0)}%)`;
@@ -479,9 +515,13 @@ async function aiDraw() {
 async function loadModel() {
   try {
     ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
-    const resp = await fetch('/model/model.onnx');
-    const buffer = await resp.arrayBuffer();
-    model = await ort.InferenceSession.create(new Uint8Array(buffer));
+    const [modelResp, featResp] = await Promise.all([
+      fetch('/model/model.onnx'),
+      fetch('/model/feature_extractor.onnx')
+    ]);
+    const [modelBuf, featBuf] = await Promise.all([modelResp.arrayBuffer(), featResp.arrayBuffer()]);
+    model = await ort.InferenceSession.create(new Uint8Array(modelBuf));
+    featureModel = await ort.InferenceSession.create(new Uint8Array(featBuf));
 
     // Populate category selector
     const select = document.getElementById('category-select');

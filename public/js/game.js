@@ -17,6 +17,11 @@ if (!config || !playerName) {
 socket.emit('join', playerName);
 
 let model = null;
+let featureModel = null;
+let customCategories = {};
+socket.on('custom-categories', (cats) => { customCategories = cats; });
+socket.emit('get-custom-categories');
+
 let currentRound = 0;
 let score = 0;
 let streak = 0;
@@ -156,6 +161,16 @@ function softmax(arr) {
   return exps.map(x => x / sum);
 }
 
+function cosineSimilarity(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB) + 1e-8);
+}
+
 async function classify() {
   if (!model || !hasStrokes) return [];
 
@@ -164,9 +179,21 @@ async function classify() {
   const logits = Array.from(output.output.data);
   const probs = softmax(logits);
 
-  const results = LABELS.map((label, i) => ({ label, prob: probs[i] }))
-    .sort((a, b) => b.prob - a.prob);
+  let results = LABELS.map((label, i) => ({ label, prob: probs[i] }));
 
+  // Merge custom categories
+  if (featureModel && Object.keys(customCategories).length > 0) {
+    const featOutput = await featureModel.run({ input: tensor });
+    const features = Array.from(featOutput.features.data);
+    for (const [name, data] of Object.entries(customCategories)) {
+      if (!data.samples || data.samples.length === 0) continue;
+      const avgSim = data.samples.reduce((sum, s) => sum + cosineSimilarity(features, s), 0) / data.samples.length;
+      const score = Math.max(0, (avgSim - 0.3) / 0.7);
+      results.push({ label: name + ' *', prob: score });
+    }
+  }
+
+  results.sort((a, b) => b.prob - a.prob);
   return results;
 }
 
@@ -191,9 +218,13 @@ function showPredictions(results, targetWord) {
 async function loadModel() {
   try {
     ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
-    const resp = await fetch('/model/model.onnx');
-    const buffer = await resp.arrayBuffer();
-    model = await ort.InferenceSession.create(new Uint8Array(buffer));
+    const [modelResp, featResp] = await Promise.all([
+      fetch('/model/model.onnx'),
+      fetch('/model/feature_extractor.onnx')
+    ]);
+    const [modelBuf, featBuf] = await Promise.all([modelResp.arrayBuffer(), featResp.arrayBuffer()]);
+    model = await ort.InferenceSession.create(new Uint8Array(modelBuf));
+    featureModel = await ort.InferenceSession.create(new Uint8Array(featBuf));
     document.getElementById('loading').style.display = 'none';
     document.getElementById('game').style.display = 'block';
     startRound();

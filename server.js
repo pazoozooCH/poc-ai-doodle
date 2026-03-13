@@ -17,6 +17,7 @@ const TIME_LIMIT = 20;
 const NUM_ROUNDS = 10;
 
 const players = new Map();
+const customCategories = {}; // { "robot": { samples: [[0.12, -0.34, ...], ...] } }
 
 function getLeaderboard() {
   return Array.from(players.values())
@@ -70,6 +71,29 @@ io.on('connection', (socket) => {
     player.round++;
 
     io.emit('leaderboard', getLeaderboard());
+  });
+
+  // Custom category training
+  socket.on('get-custom-categories', () => {
+    socket.emit('custom-categories', customCategories);
+  });
+
+  socket.on('add-sample', ({ category, features }) => {
+    if (!category || !features || features.length !== 128) return;
+    if (!customCategories[category]) {
+      customCategories[category] = { samples: [] };
+    }
+    customCategories[category].samples.push(features);
+    io.emit('custom-categories', customCategories);
+    console.log(`Custom category "${category}" now has ${customCategories[category].samples.length} samples`);
+  });
+
+  socket.on('remove-category', (category) => {
+    if (customCategories[category]) {
+      delete customCategories[category];
+      io.emit('custom-categories', customCategories);
+      console.log(`Removed custom category "${category}"`);
+    }
   });
 
   socket.on('disconnect', () => {
