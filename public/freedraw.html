@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Doodle Challenge - Free Drawing</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="loading" class="model-loading">
+    <div class="spinner"></div>
+    <p>Loading AI model...</p>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="game-header">
+      <a href="/" style="color:#888;text-decoration:none">Back</a>
+      <span>Free Drawing</span>
+    </div>
+
+    <div class="prompt-area">
+      <div class="prompt-word" id="top-prediction">Draw something!</div>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="canvas" width="280" height="280"></canvas>
+    </div>
+
+    <div class="predictions" id="predictions"></div>
+
+    <div class="game-controls">
+      <button class="btn-clear" id="btn-clear">Clear</button>
+      <img id="debug-preview" width="56" height="56" style="border:1px solid #333;border-radius:4px;image-rendering:pixelated" title="What the model sees">
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <script src="/js/freedraw.js"></script>
+</body>
+</html>
