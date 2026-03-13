@@ -171,7 +171,9 @@ async function getCustomScores(tensor) {
     const avgSim = sims.reduce((a, b) => a + b, 0) / sims.length;
     const maxSim = Math.max(...sims);
     // Use max similarity (best matching sample) for scoring
-    const score = Math.max(0, Math.min(1, (maxSim - 0.9) / 0.1));
+    // Within-category similarity ~0.85-0.90, across-category ~0.5
+    // Map 0.75-0.95 to 0-1
+    const score = Math.max(0, Math.min(1, (maxSim - 0.75) / 0.2));
     merged.push({ label: name + ' *', prob: score });
     details.push({ name, avgSim, maxSim, score, numSamples: data.samples.length });
   }
