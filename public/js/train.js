@@ -134,6 +134,7 @@ document.getElementById('btn-add-sample').addEventListener('click', async () => 
   if (!localThumbnails[currentCategory]) localThumbnails[currentCategory] = [];
   localThumbnails[currentCategory].push(thumbnail);
 
+  console.log('Sending add-sample:', currentCategory, 'features length:', features.length);
   socket.emit('add-sample', { category: currentCategory, features });
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -158,6 +159,7 @@ function updateSamplesGrid() {
 
 // Categories list (from server)
 socket.on('custom-categories', (categories) => {
+  console.log('Received custom-categories:', Object.keys(categories), categories);
   const list = document.getElementById('categories-list');
   const noMsg = document.getElementById('no-categories');
   const entries = Object.entries(categories);

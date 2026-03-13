@@ -159,20 +159,23 @@ function cosineSimilarity(a, b) {
 }
 
 async function getCustomScores(tensor) {
-  if (!featureModel || Object.keys(customCategories).length === 0) return [];
+  if (!featureModel || Object.keys(customCategories).length === 0) return { merged: [], details: [] };
   const featOutput = await featureModel.run({ input: tensor });
   const features = Array.from(featOutput.features.data);
 
-  const results = [];
+  const merged = [];
+  const details = [];
   for (const [name, data] of Object.entries(customCategories)) {
     if (!data.samples || data.samples.length === 0) continue;
-    const avgSim = data.samples.reduce((sum, s) => sum + cosineSimilarity(features, s), 0) / data.samples.length;
-    // Cosine similarities cluster around 0.85 for unrelated drawings,
-    // so only similarities > 0.9 are meaningful. Map 0.9-1.0 to 0-1.
-    const score = Math.max(0, Math.min(1, (avgSim - 0.9) / 0.1));
-    results.push({ label: name + ' *', prob: score });
+    const sims = data.samples.map(s => cosineSimilarity(features, s));
+    const avgSim = sims.reduce((a, b) => a + b, 0) / sims.length;
+    const maxSim = Math.max(...sims);
+    // Use max similarity (best matching sample) for scoring
+    const score = Math.max(0, Math.min(1, (maxSim - 0.9) / 0.1));
+    merged.push({ label: name + ' *', prob: score });
+    details.push({ name, avgSim, maxSim, score, numSamples: data.samples.length });
   }
-  return results;
+  return { merged, details };
 }
 
 async function classifyRaw(inputArray) {
@@ -193,22 +196,40 @@ async function classify() {
   let results = LABELS.map((label, i) => ({ label, prob: probs[i] }));
 
   // Merge custom categories
-  const customScores = await getCustomScores(tensor);
-  results = results.concat(customScores);
+  const { merged: customScores, details: customDetails } = await getCustomScores(tensor);
+  const allResults = results.concat(customScores);
 
-  results.sort((a, b) => b.prob - a.prob);
+  allResults.sort((a, b) => b.prob - a.prob);
 
   document.getElementById('top-prediction').textContent =
-    `${results[0].label} (${(results[0].prob * 100).toFixed(0)}%)`;
+    `${allResults[0].label} (${(allResults[0].prob * 100).toFixed(0)}%)`;
 
   const container = document.getElementById('predictions');
-  container.innerHTML = results.slice(0, 5).map(r => {
+  container.innerHTML = allResults.slice(0, 5).map(r => {
     const pct = (r.prob * 100).toFixed(0);
     const hue = Math.round(r.prob * 120);
     const bg = `hsl(${hue}, 70%, 30%)`;
     const color = `hsl(${hue}, 80%, 80%)`;
     return `<span class="prediction-tag" style="background:${bg};color:${color}">${r.label} ${pct}%</span>`;
   }).join('');
+
+  // Separate custom categories section
+  const customContainer = document.getElementById('custom-predictions');
+  if (customContainer) {
+    if (customDetails.length === 0) {
+      customContainer.innerHTML = '';
+    } else {
+      customContainer.innerHTML = customDetails
+        .sort((a, b) => b.maxSim - a.maxSim)
+        .map(d => {
+          const pct = (d.score * 100).toFixed(0);
+          const hue = Math.round(d.score * 120);
+          const bg = `hsl(${hue}, 70%, 30%)`;
+          const color = `hsl(${hue}, 80%, 80%)`;
+          return `<span class="prediction-tag" style="background:${bg};color:${color}">${d.name} ${pct}% <span style="font-size:0.7rem;opacity:0.6">(sim: ${d.maxSim.toFixed(3)})</span></span>`;
+        }).join('');
+    }
+  }
 }
 
 // --- Show Examples ---

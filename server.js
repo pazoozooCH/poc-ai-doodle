@@ -78,8 +78,13 @@ io.on('connection', (socket) => {
     socket.emit('custom-categories', customCategories);
   });
 
-  socket.on('add-sample', ({ category, features }) => {
-    if (!category || !features || features.length !== 128) return;
+  socket.on('add-sample', (data) => {
+    const { category, features } = data || {};
+    console.log('add-sample received:', category, 'features?', !!features, 'length:', features?.length);
+    if (!category || !features || features.length !== 128) {
+      console.log('add-sample REJECTED');
+      return;
+    }
     if (!customCategories[category]) {
       customCategories[category] = { samples: [] };
     }
