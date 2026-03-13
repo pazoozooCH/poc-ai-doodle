@@ -212,6 +212,9 @@ function stopAiDraw() {
   aiDrawing = false;
   document.getElementById('btn-ai-draw').textContent = 'Watch AI Draw';
   document.getElementById('ai-status').textContent = '';
+  if (!classifyInterval) {
+    classifyInterval = setInterval(classify, 300);
+  }
 }
 
 function pixelsToImageData(pixels, size) {
@@ -355,6 +358,8 @@ async function aiDraw() {
 
   aiDrawing = true;
   btn.textContent = 'Stop';
+  clearInterval(classifyInterval);
+  classifyInterval = null;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   hasStrokes = true;
