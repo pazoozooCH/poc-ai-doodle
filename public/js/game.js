@@ -142,6 +142,7 @@ function preprocessCanvas() {
   const debugEl = document.getElementById('debug-preview');
   if (debugEl) {
     tmpCtx.putImageData(imageData, 0, 0);
+    debugEl.style.display = '';
     debugEl.src = tmpCanvas.toDataURL();
   }
 
