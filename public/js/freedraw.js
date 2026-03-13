@@ -6,9 +6,11 @@ const LABELS = [
 ];
 
 let model = null;
+let samplesData = null;
 let isDrawing = false;
 let hasStrokes = false;
 let classifyInterval = null;
+let aiDrawing = false;
 
 // Canvas setup
 const canvas = document.getElementById('canvas');
@@ -33,6 +35,7 @@ function getPos(e) {
 
 function startDraw(e) {
   e.preventDefault();
+  stopAiDraw();
   isDrawing = true;
   const pos = getPos(e);
   lastX = pos.x;
@@ -68,6 +71,7 @@ canvas.addEventListener('touchend', endDraw, { passive: false });
 document.getElementById('btn-clear').addEventListener('click', clearCanvas);
 
 function clearCanvas() {
+  stopAiDraw();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   hasStrokes = false;
   document.getElementById('predictions').innerHTML = '';
@@ -138,6 +142,13 @@ function softmax(arr) {
   return exps.map(x => x / sum);
 }
 
+async function classifyRaw(inputArray) {
+  const tensor = new ort.Tensor('float32', inputArray, [1, 1, 28, 28]);
+  const output = await model.run({ input: tensor });
+  const logits = Array.from(output.output.data);
+  return softmax(logits);
+}
+
 async function classify() {
   if (!model || !hasStrokes) return;
 
@@ -149,15 +160,12 @@ async function classify() {
   const results = LABELS.map((label, i) => ({ label, prob: probs[i] }))
     .sort((a, b) => b.prob - a.prob);
 
-  // Update top prediction
   document.getElementById('top-prediction').textContent =
     `${results[0].label} (${(results[0].prob * 100).toFixed(0)}%)`;
 
-  // Show top 5 with red-yellow-green coloring
   const container = document.getElementById('predictions');
   container.innerHTML = results.slice(0, 5).map(r => {
     const pct = (r.prob * 100).toFixed(0);
-    // 0% -> red (0), 50% -> yellow (60), 100% -> green (120)
     const hue = Math.round(r.prob * 120);
     const bg = `hsl(${hue}, 70%, 30%)`;
     const color = `hsl(${hue}, 80%, 80%)`;
@@ -165,12 +173,177 @@ async function classify() {
   }).join('');
 }
 
+// --- Show Examples ---
+async function loadSamples() {
+  const resp = await fetch('/model/samples.json');
+  samplesData = await resp.json();
+}
+
+function showExamples() {
+  const cat = document.getElementById('category-select').value;
+  const grid = document.getElementById('examples-grid');
+  if (!samplesData || !samplesData[cat]) {
+    grid.innerHTML = '<span style="color:#888">No samples available</span>';
+    return;
+  }
+  grid.innerHTML = samplesData[cat].map(b64 =>
+    `<img src="data:image/png;base64,${b64}" width="56" height="56" style="border:1px solid #333;border-radius:4px;image-rendering:pixelated;cursor:pointer" class="sample-img">`
+  ).join('');
+
+  // Click a sample to load it onto the canvas
+  grid.querySelectorAll('.sample-img').forEach(img => {
+    img.addEventListener('click', () => {
+      const tmpImg = new Image();
+      tmpImg.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(tmpImg, 0, 0, canvas.width, canvas.height);
+        hasStrokes = true;
+      };
+      tmpImg.src = img.src;
+    });
+  });
+}
+
+// --- AI Draw (iterative optimization) ---
+// Works on a 28x28 pixel grid directly, renders scaled up to canvas.
+// Each step: try adding a random short stroke, keep if target prob increases.
+
+function stopAiDraw() {
+  aiDrawing = false;
+  document.getElementById('btn-ai-draw').textContent = 'Watch AI Draw';
+  document.getElementById('ai-status').textContent = '';
+}
+
+function renderPixelsToCanvas(pixels) {
+  // pixels is a Float32Array of 28*28, values 0-1 (1 = ink)
+  const imgData = ctx.createImageData(canvas.width, canvas.height);
+  const scale = canvas.width / 28;
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const srcX = Math.floor(x / scale);
+      const srcY = Math.floor(y / scale);
+      const val = pixels[srcY * 28 + srcX];
+      const gray = Math.round((1 - val) * 255);
+      const idx = (y * canvas.width + x) * 4;
+      imgData.data[idx] = gray;
+      imgData.data[idx + 1] = gray;
+      imgData.data[idx + 2] = gray;
+      imgData.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function drawStrokeOnPixels(pixels, startX, startY, length, angle) {
+  // Draw a short line on the 28x28 pixel grid
+  const result = new Float32Array(pixels);
+  for (let i = 0; i <= length; i++) {
+    const x = Math.round(startX + Math.cos(angle) * i);
+    const y = Math.round(startY + Math.sin(angle) * i);
+    // Draw a 2px brush
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const px = x + dx;
+        const py = y + dy;
+        if (px >= 0 && px < 28 && py >= 0 && py < 28) {
+          result[py * 28 + px] = Math.min(1, result[py * 28 + px] + 0.8);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+async function aiDraw() {
+  const cat = document.getElementById('category-select').value;
+  const targetIdx = LABELS.indexOf(cat);
+  const statusEl = document.getElementById('ai-status');
+  const btn = document.getElementById('btn-ai-draw');
+
+  if (aiDrawing) {
+    stopAiDraw();
+    return;
+  }
+
+  aiDrawing = true;
+  btn.textContent = 'Stop';
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  hasStrokes = true;
+
+  let pixels = new Float32Array(28 * 28);
+  let bestProb = 0;
+  let iteration = 0;
+
+  while (aiDrawing) {
+    // Try a random stroke
+    const sx = Math.random() * 26 + 1;
+    const sy = Math.random() * 26 + 1;
+    const len = Math.random() * 6 + 2;
+    const angle = Math.random() * Math.PI * 2;
+
+    const candidate = drawStrokeOnPixels(pixels, sx, sy, len, angle);
+    const probs = await classifyRaw(candidate);
+
+    if (probs[targetIdx] > bestProb) {
+      pixels = candidate;
+      bestProb = probs[targetIdx];
+      renderPixelsToCanvas(pixels);
+    }
+
+    iteration++;
+    if (iteration % 5 === 0) {
+      statusEl.textContent = `Iteration ${iteration} — ${cat}: ${(bestProb * 100).toFixed(1)}%`;
+      // Update predictions display
+      const results = LABELS.map((label, i) => ({ label, prob: probs[i] }))
+        .sort((a, b) => b.prob - a.prob);
+      document.getElementById('top-prediction').textContent =
+        `${results[0].label} (${(results[0].prob * 100).toFixed(0)}%)`;
+      const container = document.getElementById('predictions');
+      container.innerHTML = results.slice(0, 5).map(r => {
+        const pct = (r.prob * 100).toFixed(0);
+        const hue = Math.round(r.prob * 120);
+        const bg = `hsl(${hue}, 70%, 30%)`;
+        const color = `hsl(${hue}, 80%, 80%)`;
+        return `<span class="prediction-tag" style="background:${bg};color:${color}">${r.label} ${pct}%</span>`;
+      }).join('');
+    }
+
+    // Yield to browser
+    await new Promise(r => setTimeout(r, 10));
+
+    if (bestProb > 0.95) {
+      statusEl.textContent = `Done! ${cat}: ${(bestProb * 100).toFixed(1)}% after ${iteration} iterations`;
+      break;
+    }
+  }
+
+  aiDrawing = false;
+  btn.textContent = 'Watch AI Draw';
+}
+
+// --- Init ---
 async function loadModel() {
   try {
     ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
     const resp = await fetch('/model/model.onnx');
     const buffer = await resp.arrayBuffer();
     model = await ort.InferenceSession.create(new Uint8Array(buffer));
+
+    // Populate category selector
+    const select = document.getElementById('category-select');
+    LABELS.forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l;
+      opt.textContent = l;
+      select.appendChild(opt);
+    });
+
+    document.getElementById('btn-examples').addEventListener('click', showExamples);
+    document.getElementById('btn-ai-draw').addEventListener('click', aiDraw);
+
+    await loadSamples();
+
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     classifyInterval = setInterval(classify, 300);

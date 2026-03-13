@@ -32,6 +32,17 @@
       <button class="btn-clear" id="btn-clear">Clear</button>
       <img id="debug-preview" width="56" height="56" style="border:1px solid #333;border-radius:4px;image-rendering:pixelated;display:none" title="What the model sees">
     </div>
+
+    <div style="padding:20px;text-align:center;border-top:1px solid #222;margin-top:15px">
+      <div style="margin-bottom:10px;color:#888">AI Features</div>
+      <div style="display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap">
+        <select id="category-select" style="padding:10px 15px;border-radius:12px;background:#16213e;color:#eee;border:2px solid #333;font-size:1rem"></select>
+        <button id="btn-examples" class="btn-clear">Show Examples</button>
+        <button id="btn-ai-draw" style="padding:10px 25px;border:none;border-radius:12px;background:#e94560;color:white;font-weight:600;cursor:pointer">Watch AI Draw</button>
+      </div>
+      <div id="examples-grid" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:15px"></div>
+      <div id="ai-status" style="color:#888;margin-top:10px"></div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>

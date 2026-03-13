@@ -141,7 +141,38 @@ def main():
         dynamic_axes={'input': {0: 'batch'}, 'output': {0: 'batch'}},
     )
 
+    print('\nStep 4: Exporting sample images...')
+    export_samples()
+
     print('\nDone! Model saved. Start the server with: node server.js')
+
+
+def export_samples():
+    """Export 10 sample images per category as a JSON file for the frontend."""
+    import json, base64
+    from io import BytesIO
+    from PIL import Image
+
+    samples = {}
+    for cat in CATEGORIES:
+        filepath = os.path.join(DATA_DIR, f'{cat}.npy')
+        data = np.load(filepath)
+        indices = np.random.permutation(len(data))[:10]
+        cat_samples = []
+        for idx in indices:
+            img_data = data[idx].reshape(28, 28).astype('uint8')
+            # Invert: training data has white-on-black, display as black-on-white
+            img_data = 255 - img_data
+            img = Image.fromarray(img_data, mode='L')
+            buf = BytesIO()
+            img.save(buf, format='PNG')
+            cat_samples.append(base64.b64encode(buf.getvalue()).decode())
+        samples[cat] = cat_samples
+
+    out_path = os.path.join(MODEL_DIR, 'samples.json')
+    with open(out_path, 'w') as f:
+        json.dump(samples, f)
+    print(f'Saved samples to {out_path}')
 
 
 if __name__ == '__main__':
