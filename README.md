@@ -91,6 +91,22 @@ python -m venv .venv
 Curated subset of Quick, Draw! categories that are fun and recognizable:
 cat, dog, house, car, tree, fish, bird, sun, moon, star, flower, hat, shoe, bicycle, airplane, boat, guitar, pizza, apple, banana, clock, heart, smiley face, umbrella, lightning
 
+### Free Drawing Mode
+
+Standalone mode (`/freedraw.html`) with three features:
+
+1. **Free Draw** — draw anything, see live top-5 predictions with color-coded confidence
+2. **Show Examples** — display real training samples from any category (click to load onto canvas)
+3. **Watch AI Draw** — simulated annealing optimization that mutates pixels to maximize a target category's probability
+
+#### AI Draw as a Talking Point: Adversarial Examples
+
+The AI Draw feature produces images that score 95%+ confidence but look like noise to humans. This is a great demo talking point:
+
+- **Humans draw, AI recognizes** — works well, intuitive
+- **AI "draws" to fool itself** — produces gibberish that scores high
+- **The punchline:** what convinces the model has nothing to do with what convinces a human — this is exactly why adversarial attacks on AI are a real-world problem (e.g. tricking self-driving cars, bypassing content filters)
+
 ### Non-Goals (keep it simple)
 
 - No user accounts or persistence beyond the session
