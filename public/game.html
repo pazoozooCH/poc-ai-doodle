@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Doodle Challenge - Play</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="loading" class="model-loading">
+    <div class="spinner"></div>
+    <p>Loading AI model...</p>
+  </div>
+
+  <div id="game" style="display:none">
+    <div class="game-header">
+      <div class="score-display">
+        <span id="score">Score: 0</span>
+        <span id="streak"></span>
+      </div>
+      <span id="round-info">1 / 10</span>
+    </div>
+
+    <div class="prompt-area">
+      <div>Draw a</div>
+      <div class="prompt-word" id="prompt-word">cat</div>
+      <div class="timer" id="timer">20.0</div>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="canvas" width="280" height="280"></canvas>
+    </div>
+
+    <div class="predictions" id="predictions"></div>
+
+    <div class="game-controls">
+      <button class="btn-clear" id="btn-clear">Clear</button>
+    </div>
+  </div>
+
+  <div id="game-over" class="game-over" style="display:none">
+    <h1>Game Over!</h1>
+    <div class="final-score" id="final-score">0</div>
+    <p>points</p>
+    <button onclick="window.location.href='/'">Play Again</button>
+  </div>
+
+  <div id="round-overlay" class="round-result-overlay" style="display:none">
+    <div class="result-content" id="round-result-text"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <script src="/js/game.js"></script>
+</body>
+</html>

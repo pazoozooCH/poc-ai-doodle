@@ -1,0 +1,16 @@
+{
+  "name": "poc-ai",
+  "version": "1.0.0",
+  "description": "### Demo 1: Doodle Challenge (~15-20 min)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
+}
