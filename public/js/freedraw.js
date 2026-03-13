@@ -214,24 +214,63 @@ function stopAiDraw() {
   document.getElementById('ai-status').textContent = '';
 }
 
-function renderPixelsToCanvas(pixels) {
-  // pixels is a Float32Array of 28*28, values 0-1 (1 = ink)
-  const imgData = ctx.createImageData(canvas.width, canvas.height);
-  const scale = canvas.width / 28;
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
+function pixelsToImageData(pixels, size) {
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = size;
+  tmpCanvas.height = size;
+  const tmpCtx = tmpCanvas.getContext('2d');
+  const imgData = tmpCtx.createImageData(size, size);
+  const scale = size / 28;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
       const srcX = Math.floor(x / scale);
       const srcY = Math.floor(y / scale);
       const val = pixels[srcY * 28 + srcX];
       const gray = Math.round((1 - val) * 255);
-      const idx = (y * canvas.width + x) * 4;
+      const idx = (y * size + x) * 4;
       imgData.data[idx] = gray;
       imgData.data[idx + 1] = gray;
       imgData.data[idx + 2] = gray;
       imgData.data[idx + 3] = 255;
     }
   }
-  ctx.putImageData(imgData, 0, 0);
+  tmpCtx.putImageData(imgData, 0, 0);
+  return tmpCanvas;
+}
+
+function renderPixelsToCanvas(pixels) {
+  const tmpCanvas = pixelsToImageData(pixels, canvas.width);
+  ctx.drawImage(tmpCanvas, 0, 0);
+}
+
+function pixelsToDataURL(pixels) {
+  return pixelsToImageData(pixels, 56).toDataURL();
+}
+
+// Best snapshots gallery
+const topSnapshots = []; // { prob, dataURL }
+const MAX_SNAPSHOTS = 5;
+
+function updateGallery(pixels, prob, cat) {
+  const dominated = topSnapshots.length >= MAX_SNAPSHOTS && prob <= topSnapshots[topSnapshots.length - 1].prob;
+  if (dominated) return;
+
+  const dataURL = pixelsToDataURL(pixels);
+  topSnapshots.push({ prob, dataURL });
+  topSnapshots.sort((a, b) => b.prob - a.prob);
+  if (topSnapshots.length > MAX_SNAPSHOTS) topSnapshots.length = MAX_SNAPSHOTS;
+
+  const gallery = document.getElementById('ai-gallery');
+  gallery.innerHTML = topSnapshots.map(s => {
+    const pct = (s.prob * 100).toFixed(0);
+    const hue = Math.round(s.prob * 120);
+    const border = `hsl(${hue}, 70%, 45%)`;
+    const color = `hsl(${hue}, 80%, 80%)`;
+    return `<div style="text-align:center">
+      <img src="${s.dataURL}" width="56" height="56" style="border:2px solid ${border};border-radius:4px;image-rendering:pixelated">
+      <div style="font-size:0.8rem;color:${color};margin-top:2px">${pct}%</div>
+    </div>`;
+  }).join('');
 }
 
 function mutatePixels(pixels) {
@@ -319,6 +358,8 @@ async function aiDraw() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   hasStrokes = true;
+  topSnapshots.length = 0;
+  document.getElementById('ai-gallery').innerHTML = '';
 
   let pixels = new Float32Array(28 * 28);
   let bestProb = 0;
@@ -337,6 +378,7 @@ async function aiDraw() {
       accepted++;
       renderPixelsToCanvas(pixels);
       updatePredictions(bestProbs);
+      updateGallery(pixels, bestProb, cat);
     }
 
     iteration++;
