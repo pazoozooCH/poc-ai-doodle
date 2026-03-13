@@ -29,7 +29,7 @@ let hasStrokes = false;
 // Canvas setup
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-ctx.lineWidth = 6;
+ctx.lineWidth = 16;
 ctx.lineCap = 'round';
 ctx.lineJoin = 'round';
 ctx.strokeStyle = '#000';
@@ -91,18 +91,43 @@ function clearCanvas() {
 
 // Model inference
 function preprocessCanvas() {
-  // Resize canvas content to 28x28 grayscale, inverted (white strokes on black)
+  // Find bounding box of the drawing to center it (like the training data)
+  const srcData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const i = (y * canvas.width + x) * 4;
+      if (srcData[i + 3] > 0 && (srcData[i] < 200 || srcData[i+1] < 200 || srcData[i+2] < 200)) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+
   const tmpCanvas = document.createElement('canvas');
   tmpCanvas.width = 28;
   tmpCanvas.height = 28;
   const tmpCtx = tmpCanvas.getContext('2d');
   tmpCtx.fillStyle = 'white';
   tmpCtx.fillRect(0, 0, 28, 28);
-  tmpCtx.drawImage(canvas, 0, 0, 28, 28);
+
+  if (maxX > minX && maxY > minY) {
+    // Add padding and maintain aspect ratio, centered in 28x28
+    const padding = 2;
+    const drawW = maxX - minX;
+    const drawH = maxY - minY;
+    const scale = (28 - padding * 2) / Math.max(drawW, drawH);
+    const w = drawW * scale;
+    const h = drawH * scale;
+    const offX = (28 - w) / 2;
+    const offY = (28 - h) / 2;
+    tmpCtx.drawImage(canvas, minX, minY, drawW, drawH, offX, offY, w, h);
+  }
 
   const imageData = tmpCtx.getImageData(0, 0, 28, 28);
   const data = imageData.data;
-  // ONNX model expects [1, 1, 28, 28] (NCHW format)
   const input = new Float32Array(28 * 28);
 
   for (let i = 0; i < 28 * 28; i++) {
@@ -111,6 +136,13 @@ function preprocessCanvas() {
     const b = data[i * 4 + 2];
     const gray = (r + g + b) / 3;
     input[i] = 1.0 - gray / 255.0;
+  }
+
+  // Update debug preview
+  const debugEl = document.getElementById('debug-preview');
+  if (debugEl) {
+    tmpCtx.putImageData(imageData, 0, 0);
+    debugEl.src = tmpCanvas.toDataURL();
   }
 
   return new ort.Tensor('float32', input, [1, 1, 28, 28]);
@@ -140,17 +172,27 @@ async function classify() {
 function showPredictions(results, targetWord) {
   const container = document.getElementById('predictions');
   const top5 = results.slice(0, 5);
-  container.innerHTML = top5.map(r => {
+  const targetInTop5 = top5.some(r => r.label === targetWord);
+  const tags = top5.map(r => {
     const isMatch = r.label === targetWord;
     const pct = (r.prob * 100).toFixed(0);
     return `<span class="prediction-tag ${isMatch ? 'match' : ''}">${r.label} ${pct}%</span>`;
-  }).join('');
+  });
+  if (!targetInTop5) {
+    const target = results.find(r => r.label === targetWord);
+    const pct = (target.prob * 100).toFixed(0);
+    tags.push(`<span class="prediction-tag match" style="opacity:0.6">${target.label} ${pct}%</span>`);
+  }
+  container.innerHTML = tags.join('');
 }
 
 // Game flow
 async function loadModel() {
   try {
-    model = await ort.InferenceSession.create('/model/model.onnx');
+    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+    const resp = await fetch('/model/model.onnx');
+    const buffer = await resp.arrayBuffer();
+    model = await ort.InferenceSession.create(new Uint8Array(buffer));
     document.getElementById('loading').style.display = 'none';
     document.getElementById('game').style.display = 'block';
     startRound();

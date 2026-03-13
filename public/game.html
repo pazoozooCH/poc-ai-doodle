@@ -35,6 +35,7 @@
 
     <div class="game-controls">
       <button class="btn-clear" id="btn-clear">Clear</button>
+      <img id="debug-preview" width="56" height="56" style="border:1px solid #333;border-radius:4px;image-rendering:pixelated" title="What the model sees">
     </div>
   </div>
 
@@ -50,7 +51,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
   <script src="/js/game.js"></script>
 </body>
 </html>
