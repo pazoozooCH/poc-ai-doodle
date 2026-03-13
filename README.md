@@ -107,8 +107,23 @@ The AI Draw feature produces images that score 95%+ confidence but look like noi
 - **AI "draws" to fool itself** — produces gibberish that scores high
 - **The punchline:** what convinces the model has nothing to do with what convinces a human — this is exactly why adversarial attacks on AI are a real-world problem (e.g. tricking self-driving cars, bypassing content filters)
 
+### Custom Category Training
+
+Training page (`/train.html`) lets participants teach the model new categories using KNN on the CNN's 128-dim feature space:
+
+1. Enter a category name (e.g. "robot")
+2. Draw 3-5 varied samples — each takes effect immediately
+3. All participants see the new category in real-time via WebSocket
+4. Classification uses cosine similarity against the feature vectors of training samples
+
+**Note:** Custom categories are stored in server memory and lost on restart.
+
 ### Non-Goals (keep it simple)
 
 - No user accounts or persistence beyond the session
 - No mobile-specific drawing optimizations (canvas touch works well enough)
-- No custom model training — use pre-trained Quick, Draw! model as-is
+
+### Future Improvements
+
+- Persist custom categories to a JSON file so they survive server restarts
+- Allow custom categories as game prompts in the challenge mode
