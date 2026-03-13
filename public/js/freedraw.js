@@ -167,7 +167,9 @@ async function getCustomScores(tensor) {
   for (const [name, data] of Object.entries(customCategories)) {
     if (!data.samples || data.samples.length === 0) continue;
     const avgSim = data.samples.reduce((sum, s) => sum + cosineSimilarity(features, s), 0) / data.samples.length;
-    const score = Math.max(0, (avgSim - 0.3) / 0.7);
+    // Cosine similarities cluster around 0.85 for unrelated drawings,
+    // so only similarities > 0.9 are meaningful. Map 0.9-1.0 to 0-1.
+    const score = Math.max(0, Math.min(1, (avgSim - 0.9) / 0.1));
     results.push({ label: name + ' *', prob: score });
   }
   return results;

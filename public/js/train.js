@@ -144,7 +144,13 @@ document.getElementById('btn-add-sample').addEventListener('click', async () => 
 function updateSamplesGrid() {
   const grid = document.getElementById('samples-grid');
   const thumbnails = localThumbnails[currentCategory] || [];
-  document.getElementById('sample-count').textContent = `(${thumbnails.length} samples)`;
+  const count = thumbnails.length;
+  document.getElementById('sample-count').textContent = `(${count} sample${count !== 1 ? 's' : ''})`;
+  const hint = document.getElementById('sample-hint');
+  if (count === 0) hint.textContent = 'Draw at least 3 varied examples. Each sample works immediately — no "finish" step needed.';
+  else if (count < 3) hint.textContent = `${3 - count} more sample${3 - count > 1 ? 's' : ''} recommended. Try drawing it in different styles/sizes.`;
+  else hint.textContent = 'Looking good! Try it in Free Drawing. You can add more samples to improve accuracy.';
+  hint.style.color = count >= 3 ? '#2ecc71' : '#e94560';
   grid.innerHTML = thumbnails.map(t =>
     `<img src="${t}" width="56" height="56" style="border:1px solid #333;border-radius:4px;image-rendering:pixelated">`
   ).join('');
