@@ -1,3 +1,14 @@
+# POC AI
+
+## Claude Setup
+
+### Plugins
+
+```
+/plugin marketplace add anthropics/claude-code
+/plugin install frontend-design@claude-code-plugins
+```
+
 ## Plan
 
 ### Demo 1: Doodle Challenge (~15-20 min)
@@ -27,10 +38,25 @@ A multiplayer browser game where players race to draw recognizable doodles. The 
 
 ### Tech Stack
 
-- **Frontend:** HTML Canvas + vanilla JS + TensorFlow.js
-- **Model:** Pre-trained CNN on Google Quick, Draw! dataset (~345 categories)
+- **Frontend:** HTML Canvas + vanilla JS + ONNX Runtime Web
+- **Model:** CNN trained on Google Quick, Draw! dataset (25 categories), PyTorch -> ONNX
 - **Backend:** Node.js (Express) with WebSocket (Socket.io) for live leaderboard
 - **Networking:** All players connect via same WiFi to host machine's local IP (no accounts or tunnels needed)
+
+### Training the Model
+
+```bash
+cd train
+python -m venv .venv
+.venv/bin/pip install torch torchvision requests onnx onnxscript
+.venv/bin/python train_model.py
+```
+
+- Downloads ~200MB of Quick, Draw! .npy data (cached in `train/data/`)
+- Trains a 3-layer CNN on 200k samples (8k per category)
+- Exports to ONNX format in `public/model/model.onnx`
+- **Training time:** ~1.5 min on GPU (CUDA), longer on CPU
+- **Validation accuracy:** ~90%
 
 ### Gameplay Flow
 

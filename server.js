@@ -10,8 +10,8 @@ app.use(express.static('public'));
 
 const WORD_LIST = [
   'cat', 'dog', 'house', 'car', 'tree', 'fish', 'bird', 'sun', 'moon', 'star',
-  'flower', 'hat', 'shoe', 'bicycle', 'airplane', 'boat', 'guitar', 'pizza',
-  'apple', 'banana', 'clock', 'heart', 'smiley face', 'umbrella', 'lightning'
+  'flower', 'hat', 'shoe', 'bicycle', 'airplane', 'sailboat', 'guitar', 'pizza',
+  'apple', 'banana', 'clock', 'skull', 'smiley face', 'umbrella', 'lightning'
 ];
 const TIME_LIMIT = 20;
 const NUM_ROUNDS = 10;

@@ -1,21 +1,23 @@
 """
 Download Quick, Draw! data and train a CNN classifier.
-Exports the model in TensorFlow.js format to ../public/model/
+Exports the model in ONNX format to ../public/model/
 
 Usage:
-    pip install tensorflow tensorflowjs numpy requests
-    python train_model.py
+    cd train
+    ../.venv/bin/python train_model.py
 """
 
 import os
 import numpy as np
 import requests
-import tensorflow as tf
-import tensorflowjs as tfjs
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
 
 CATEGORIES = [
-    'airplane', 'apple', 'banana', 'bicycle', 'bird', 'boat', 'car', 'cat',
-    'clock', 'dog', 'fish', 'flower', 'guitar', 'hat', 'heart', 'house',
+    'airplane', 'apple', 'banana', 'bicycle', 'bird', 'sailboat', 'car', 'cat',
+    'clock', 'dog', 'fish', 'flower', 'guitar', 'hat', 'skull', 'house',
     'lightning', 'moon', 'pizza', 'shoe', 'smiley face', 'star', 'sun',
     'tree', 'umbrella'
 ]
@@ -24,6 +26,29 @@ DATA_DIR = 'data'
 MODEL_DIR = os.path.join('..', 'public', 'model')
 SAMPLES_PER_CATEGORY = 8000
 BASE_URL = 'https://storage.googleapis.com/quickdraw_dataset/full/numpy_bitmap'
+
+
+class DoodleCNN(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(1, 32, 3), nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, 3), nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(64, 128, 3), nn.ReLU(),
+        )
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Dropout(0.3),
+            nn.Linear(128 * 3 * 3, 128), nn.ReLU(),
+            nn.Linear(128, num_classes),
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.classifier(x)
+        return x
 
 
 def download_data():
@@ -45,70 +70,76 @@ def download_data():
             print(f'Using cached {cat}')
 
         data = np.load(filepath)
-        # Take a subset and shuffle
         indices = np.random.permutation(len(data))[:SAMPLES_PER_CATEGORY]
         subset = data[indices]
         all_x.append(subset)
         all_y.append(np.full(len(subset), i))
 
-    X = np.concatenate(all_x).reshape(-1, 28, 28, 1).astype('float32') / 255.0
-    y = np.concatenate(all_y)
+    X = np.concatenate(all_x).reshape(-1, 1, 28, 28).astype('float32') / 255.0
+    y = np.concatenate(all_y).astype('int64')
 
-    # Shuffle
     perm = np.random.permutation(len(X))
     return X[perm], y[perm]
 
 
-def build_model(num_classes):
-    model = tf.keras.Sequential([
-        tf.keras.layers.Conv2D(32, 3, activation='relu', input_shape=(28, 28, 1)),
-        tf.keras.layers.MaxPooling2D(2),
-        tf.keras.layers.Conv2D(64, 3, activation='relu'),
-        tf.keras.layers.MaxPooling2D(2),
-        tf.keras.layers.Conv2D(128, 3, activation='relu'),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dropout(0.3),
-        tf.keras.layers.Dense(128, activation='relu'),
-        tf.keras.layers.Dense(num_classes, activation='softmax')
-    ])
-    model.compile(
-        optimizer='adam',
-        loss='sparse_categorical_crossentropy',
-        metrics=['accuracy']
-    )
-    return model
-
-
 def main():
-    print(f'Training model for {len(CATEGORIES)} categories')
-    print(f'Categories: {", ".join(CATEGORIES)}\n')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f'Training on: {device}')
+    print(f'Categories: {len(CATEGORIES)}\n')
 
     print('Step 1: Downloading data...')
     X, y = download_data()
     print(f'Dataset: {X.shape[0]} samples\n')
 
     split = int(len(X) * 0.9)
-    X_train, X_val = X[:split], X[split:]
-    y_train, y_val = y[:split], y[split:]
+    train_ds = TensorDataset(torch.from_numpy(X[:split]), torch.from_numpy(y[:split]))
+    val_ds = TensorDataset(torch.from_numpy(X[split:]), torch.from_numpy(y[split:]))
+    train_dl = DataLoader(train_ds, batch_size=128, shuffle=True)
+    val_dl = DataLoader(val_ds, batch_size=256)
 
     print('Step 2: Training model...')
-    model = build_model(len(CATEGORIES))
-    model.summary()
+    model = DoodleCNN(len(CATEGORIES)).to(device)
+    optimizer = optim.Adam(model.parameters())
+    criterion = nn.CrossEntropyLoss()
 
-    model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=8,
-        batch_size=128,
-        verbose=1
-    )
+    for epoch in range(8):
+        model.train()
+        total_loss, correct, total = 0, 0, 0
+        for xb, yb in train_dl:
+            xb, yb = xb.to(device), yb.to(device)
+            pred = model(xb)
+            loss = criterion(pred, yb)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item() * len(xb)
+            correct += (pred.argmax(1) == yb).sum().item()
+            total += len(xb)
 
-    val_loss, val_acc = model.evaluate(X_val, y_val, verbose=0)
-    print(f'\nValidation accuracy: {val_acc:.4f}')
+        model.eval()
+        val_correct, val_total = 0, 0
+        with torch.no_grad():
+            for xb, yb in val_dl:
+                xb, yb = xb.to(device), yb.to(device)
+                pred = model(xb)
+                val_correct += (pred.argmax(1) == yb).sum().item()
+                val_total += len(xb)
 
-    print(f'\nStep 3: Exporting to TensorFlow.js format -> {MODEL_DIR}')
+        print(f'Epoch {epoch+1}/8 - loss: {total_loss/total:.4f} - '
+              f'acc: {correct/total:.4f} - val_acc: {val_correct/val_total:.4f}')
+
+    print(f'\nStep 3: Exporting to ONNX -> {MODEL_DIR}')
     os.makedirs(MODEL_DIR, exist_ok=True)
-    tfjs.converters.save_keras_model(model, MODEL_DIR)
+    model.eval()
+    model.cpu()
+    dummy = torch.randn(1, 1, 28, 28)
+    torch.onnx.export(
+        model, dummy,
+        os.path.join(MODEL_DIR, 'model.onnx'),
+        input_names=['input'],
+        output_names=['output'],
+        dynamic_axes={'input': {0: 'batch'}, 'output': {0: 'batch'}},
+    )
 
     print('\nDone! Model saved. Start the server with: node server.js')
 

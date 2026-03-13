@@ -1,6 +1,6 @@
 const LABELS = [
-  'airplane', 'apple', 'banana', 'bicycle', 'bird', 'boat', 'car', 'cat',
-  'clock', 'dog', 'fish', 'flower', 'guitar', 'hat', 'heart', 'house',
+  'airplane', 'apple', 'banana', 'bicycle', 'bird', 'sailboat', 'car', 'cat',
+  'clock', 'dog', 'fish', 'flower', 'guitar', 'hat', 'skull', 'house',
   'lightning', 'moon', 'pizza', 'shoe', 'smiley face', 'star', 'sun',
   'tree', 'umbrella'
 ];
@@ -102,10 +102,10 @@ function preprocessCanvas() {
 
   const imageData = tmpCtx.getImageData(0, 0, 28, 28);
   const data = imageData.data;
+  // ONNX model expects [1, 1, 28, 28] (NCHW format)
   const input = new Float32Array(28 * 28);
 
   for (let i = 0; i < 28 * 28; i++) {
-    // Convert to grayscale and invert (Quick Draw expects white on black)
     const r = data[i * 4];
     const g = data[i * 4 + 1];
     const b = data[i * 4 + 2];
@@ -113,17 +113,23 @@ function preprocessCanvas() {
     input[i] = 1.0 - gray / 255.0;
   }
 
-  return tf.tensor4d(input, [1, 28, 28, 1]);
+  return new ort.Tensor('float32', input, [1, 1, 28, 28]);
+}
+
+function softmax(arr) {
+  const max = Math.max(...arr);
+  const exps = arr.map(x => Math.exp(x - max));
+  const sum = exps.reduce((a, b) => a + b);
+  return exps.map(x => x / sum);
 }
 
 async function classify() {
   if (!model || !hasStrokes) return [];
 
   const tensor = preprocessCanvas();
-  const prediction = model.predict(tensor);
-  const probs = await prediction.data();
-  tensor.dispose();
-  prediction.dispose();
+  const output = await model.run({ input: tensor });
+  const logits = Array.from(output.output.data);
+  const probs = softmax(logits);
 
   const results = LABELS.map((label, i) => ({ label, prob: probs[i] }))
     .sort((a, b) => b.prob - a.prob);
@@ -144,14 +150,14 @@ function showPredictions(results, targetWord) {
 // Game flow
 async function loadModel() {
   try {
-    model = await tf.loadLayersModel('/model/model.json');
+    model = await ort.InferenceSession.create('/model/model.onnx');
     document.getElementById('loading').style.display = 'none';
     document.getElementById('game').style.display = 'block';
     startRound();
   } catch (err) {
     document.getElementById('loading').innerHTML =
       `<p style="color:#e94560">Failed to load model. Make sure you've trained it first.<br>
-       Run: <code>cd train && python train_model.py</code></p>`;
+       Run: <code>cd train && .venv/bin/python train_model.py</code></p>`;
     console.error(err);
   }
 }
