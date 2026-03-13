@@ -1,42 +1,72 @@
 ## Plan
 
-### Demo 1: Local AI Doodle Classifier (~15-20 min)
+### Demo 1: Doodle Challenge (~15-20 min)
 
-**What works well about this:**
-- Visual and interactive — audience can participate by drawing
-- Shows AI runs locally, not just in the cloud
-- Easy to understand, no domain knowledge needed
-
-**Practical suggestions:**
-- Use a small model like **MobileNet** or a fine-tuned version of Google's **Quick, Draw!** dataset (345 categories of doodles, perfect fit)
-- A simple stack: HTML canvas for drawing + ONNX Runtime or TensorFlow.js in the browser, or a Python backend with a lightweight model
-- Alternatively, use a **multimodal local model** (e.g. LLaVA via Ollama) to classify the doodle — this is simpler to set up and more impressive since it uses general vision, not a purpose-built classifier
-- Keep a few pre-drawn doodles ready in case live drawing gets awkward
+Interactive multiplayer doodle game where participants compete on their phones/laptops.
 
 ### Demo 2: Bootstrapping a Project with Claude Code (~25-30 min)
 
-**What works well about this:**
-- Shows the practical, day-to-day value of AI for developers
-- Live coding is inherently engaging
-
-**Practical suggestions:**
-- **Pick the project in advance and rehearse it** — live demos with LLMs can surprise you; know what prompts produce good results
-- Good candidates: a small full-stack app (todo app with API + UI), a CLI tool, or a simple game
-- Tie it to demo 1 if you want a narrative arc — e.g. "now let's use Claude Code to build the doodle app frontend"
-- Show a mix: initial scaffolding, then iterative refinement ("now add a leaderboard"), then maybe a bug fix
-- Have a git checkpoint you can reset to if things go sideways
+Live-code a project from scratch using Claude Code to showcase AI-assisted development.
 
 ### Time Budget
 
 | Segment | Time |
 |---|---|
 | Intro / context setting | 5 min |
-| Demo 1: Doodle classifier | 15-20 min |
+| Demo 1: Doodle Challenge | 15-20 min |
 | Demo 2: Claude Code live build | 25-30 min |
 | Q&A / buffer | 5-10 min |
 
-### Key Risk Mitigations
+---
 
-- **Rehearse both demos end-to-end** at least once — especially demo 2, since LLM output isn't deterministic
-- **Have recordings/screenshots as backup** in case network or API issues hit during the live demo
-- **Keep the local model downloaded ahead of time** — don't rely on downloading during the demo
+## Demo 1: Doodle Challenge — Spec
+
+### Overview
+
+A multiplayer browser game where players race to draw recognizable doodles. The AI classifies drawings in real-time using TensorFlow.js (runs entirely in each player's browser — no server-side inference needed).
+
+### Tech Stack
+
+- **Frontend:** HTML Canvas + vanilla JS + TensorFlow.js
+- **Model:** Pre-trained CNN on Google Quick, Draw! dataset (~345 categories)
+- **Backend:** Node.js (Express) with WebSocket (Socket.io) for live leaderboard
+- **Networking:** All players connect via same WiFi to host machine's local IP (no accounts or tunnels needed)
+
+### Gameplay Flow
+
+1. Player opens the URL on their phone/laptop and enters a name
+2. App displays a random prompt: _"Draw a **cat**"_ + countdown timer (e.g. 20 seconds)
+3. Player draws on the canvas
+4. Model classifies continuously as the player draws — shows live top-3 predictions
+5. When the model's top prediction matches the prompt → **success**, time is recorded
+6. Next prompt appears immediately — keep going for N rounds (e.g. 10)
+7. If timer runs out → fail, move to next prompt
+
+### Scoring
+
+- **Speed bonus:** faster recognition = more points
+- **Streak bonus:** consecutive successes multiply the score
+- Formula: `points = max(0, timeLimit - timeTaken) * streakMultiplier`
+
+### Leaderboard
+
+- Visible on a shared "host" screen (projected)
+- Updates in real-time via WebSocket as players complete rounds
+- Shows: rank, player name, score, current streak, rounds completed
+
+### Pages / Views
+
+1. **Join screen** — name input + "Join" button
+2. **Game screen** — canvas, current prompt, timer, live predictions, score
+3. **Leaderboard screen** (host view) — full-screen leaderboard for projector
+
+### Word List
+
+Curated subset of Quick, Draw! categories that are fun and recognizable:
+cat, dog, house, car, tree, fish, bird, sun, moon, star, flower, hat, shoe, bicycle, airplane, boat, guitar, pizza, apple, banana, clock, heart, smiley face, umbrella, lightning
+
+### Non-Goals (keep it simple)
+
+- No user accounts or persistence beyond the session
+- No mobile-specific drawing optimizations (canvas touch works well enough)
+- No custom model training — use pre-trained Quick, Draw! model as-is
