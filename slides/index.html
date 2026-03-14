@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Lunch Demo - InfTec</title>
   <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/reveal.css">
-  <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/theme/white.css">
+  <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/theme/black.css">
   <style>
     :root {
       --inftec-orange: #F18D0D;
@@ -17,20 +17,23 @@
 
     .reveal {
       font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      color: var(--inftec-dark);
+      color: var(--inftec-light);
     }
+
+    .reveal .slides { background: var(--inftec-dark); }
+    body { background: var(--inftec-dark); }
 
     .reveal h1, .reveal h2, .reveal h3 {
       text-transform: none;
-      color: var(--inftec-dark);
+      color: var(--inftec-light);
       font-weight: 700;
     }
 
     .reveal h1 { color: var(--inftec-orange); }
 
     .reveal strong { color: var(--inftec-orange); }
-    .reveal em { color: var(--inftec-dark); font-style: italic; }
-    .reveal code { color: var(--inftec-red); background: var(--inftec-light); padding: 2px 8px; border-radius: 4px; }
+    .reveal em { color: var(--inftec-light); font-style: italic; }
+    .reveal code { color: var(--inftec-yellow); background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px; }
     .reveal ul, .reveal ol { text-align: left; }
 
     .reveal .slide-logo {
@@ -38,14 +41,15 @@
       top: 20px;
       left: 30px;
       height: 28px;
-      opacity: 0.6;
+      opacity: 0.7;
       z-index: 10;
     }
 
     .reveal a { color: var(--inftec-orange); }
-    .reveal a:hover { color: var(--inftec-red); }
-    .reveal .slide-number { color: var(--inftec-dark); }
+    .reveal a:hover { color: var(--inftec-yellow); }
+    .reveal .slide-number { color: var(--inftec-light); }
     .reveal .progress { color: var(--inftec-orange); }
+    .reveal .controls { color: var(--inftec-orange); }
   </style>
 </head>
 <body>
