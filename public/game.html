@@ -7,29 +7,29 @@
   <title>Doodle Challenge - Play</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    /* Space Invaders player view */
-    .si-invader-list {
+    .lobby-view {
       display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: center;
       justify-content: center;
-      padding: 10px;
-    }
-    .si-invader-tag {
-      padding: 6px 14px;
-      border-radius: 20px;
-      background: rgba(233, 69, 96, 0.2);
-      border: 1px solid rgba(233, 69, 96, 0.4);
-      font-size: 0.85rem;
-      color: #eee;
-    }
-    .si-feedback {
+      min-height: 80vh;
       text-align: center;
-      padding: 10px;
-      font-size: 1.1rem;
-      font-weight: 600;
-      min-height: 2em;
+      padding: 20px;
     }
+    .lobby-view h2 { color: #e94560; margin-bottom: 10px; }
+    .lobby-mode { color: #888; font-size: 0.9rem; margin-bottom: 20px; }
+    .lobby-players-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 15px 0; }
+    .lobby-waiting { color: #888; font-size: 1.1rem; margin-top: 20px; }
+    .lobby-waiting .spinner-inline {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid #333; border-top-color: #e94560;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      vertical-align: middle; margin-right: 8px;
+    }
+
+    .si-invader-list { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 10px; }
+    .si-invader-tag { padding: 6px 14px; border-radius: 20px; background: rgba(233,69,96,0.2); border: 1px solid rgba(233,69,96,0.4); font-size: 0.85rem; color: #eee; }
+    .si-feedback { text-align: center; padding: 10px; font-size: 1.1rem; font-weight: 600; min-height: 2em; }
     .si-feedback.hit { color: #2ecc71; }
     .si-feedback.miss { color: #e94560; }
   </style>
@@ -38,6 +38,17 @@
   <div id="loading" class="model-loading">
     <div class="spinner"></div>
     <p>Loading AI model...</p>
+  </div>
+
+  <!-- Lobby -->
+  <div id="lobby" style="display:none">
+    <div class="lobby-view">
+      <h2>Doodle Challenge</h2>
+      <div class="lobby-mode">Mode: <strong id="lobby-mode">Quick Draw</strong></div>
+      <div id="lobby-count" style="color:#888">0 players</div>
+      <div class="lobby-players-grid" id="lobby-players"></div>
+      <div class="lobby-waiting"><span class="spinner-inline"></span>Waiting for host to start...</div>
+    </div>
   </div>
 
   <!-- Quick Draw mode -->
@@ -93,8 +104,8 @@
       <button class="btn-clear" id="si-clear">Clear</button>
     </div>
 
-    <div id="si-waiting" style="text-align:center;padding:20px;color:#888">
-      Waiting for host to start the game...
+    <div id="si-waiting" style="text-align:center;padding:20px;color:#888;display:none">
+      Waiting for host...
     </div>
   </div>
 

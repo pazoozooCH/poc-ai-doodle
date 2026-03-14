@@ -1,34 +1,71 @@
 const socket = io();
 
-// ============ Mode switching ============
+// ============ State ============
 let currentMode = 'quick-draw';
+let currentState = 'lobby';
+
+// ============ DOM refs ============
+const modeBtns = document.querySelectorAll('.mode-btn');
+const lobbyContainer = document.getElementById('lobby-container');
 const qdContainer = document.getElementById('qd-container');
 const siContainer = document.getElementById('si-container');
-const modeBtns = document.querySelectorAll('.mode-btn');
+const startBtn = document.getElementById('btn-start-game');
+const stopBtn = document.getElementById('btn-stop-game');
 
+// ============ Mode switching ============
 modeBtns.forEach(btn => {
   btn.addEventListener('click', () => {
-    const mode = btn.dataset.mode;
-    socket.emit('set-game-mode', mode);
+    socket.emit('set-game-mode', btn.dataset.mode);
   });
 });
 
-socket.on('game-mode', (mode) => {
-  currentMode = mode;
+startBtn.addEventListener('click', () => {
+  socket.emit('start-game');
+});
+
+stopBtn.addEventListener('click', () => {
+  socket.emit('stop-game');
+});
+
+// ============ Full state updates ============
+socket.on('full-state', ({ gameMode, gameState, players, leaderboard }) => {
+  currentMode = gameMode;
+  currentState = gameState;
+
+  // Update mode buttons
   modeBtns.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.mode === mode);
+    btn.classList.toggle('active', btn.dataset.mode === gameMode);
   });
-  qdContainer.style.display = mode === 'quick-draw' ? '' : 'none';
-  siContainer.style.display = mode === 'space-invaders' ? '' : 'none';
+
+  // Show/hide containers
+  lobbyContainer.style.display = gameState === 'lobby' ? '' : 'none';
+  qdContainer.style.display = gameState === 'playing' && gameMode === 'quick-draw' ? '' : 'none';
+  siContainer.style.display = gameState === 'playing' && gameMode === 'space-invaders' ? '' : 'none';
+
+  // Start/stop buttons
+  startBtn.style.display = gameState === 'lobby' ? '' : 'none';
+  stopBtn.style.display = gameState === 'playing' ? '' : 'none';
+
+  // Lobby player list
+  const lobbyList = document.getElementById('lobby-players');
+  if (players.length === 0) {
+    lobbyList.innerHTML = '<p class="no-players">Waiting for players to join...</p>';
+  } else {
+    lobbyList.innerHTML = players.map(p =>
+      `<div style="display:inline-block;padding:8px 16px;margin:4px;background:#16213e;border-radius:20px;font-size:0.95rem">${p.name}</div>`
+    ).join('');
+  }
+  document.getElementById('lobby-count').textContent = `${players.length} player${players.length !== 1 ? 's' : ''} joined`;
+
+  // Leaderboard (QD + SI sidebar)
+  updateLeaderboard(leaderboard);
 });
 
-// ============ Quick Draw Leaderboard ============
-const content = document.getElementById('leaderboard-content');
-
-socket.on('leaderboard', (players) => {
-  // Update Quick Draw leaderboard
+function updateLeaderboard(players) {
+  // Quick Draw leaderboard
+  const content = document.getElementById('leaderboard-content');
   if (players.length === 0) {
-    content.innerHTML = '<p class="no-players">Waiting for players...</p>';
+    content.innerHTML = '<p class="no-players">No scores yet</p>';
   } else {
     const rows = players.map(p => {
       const rankClass = p.rank <= 3 ? `rank-${p.rank}` : '';
@@ -51,7 +88,7 @@ socket.on('leaderboard', (players) => {
       </table>`;
   }
 
-  // Update Space Invaders sidebar scores
+  // SI sidebar scores
   const siScores = document.getElementById('si-scores');
   if (siScores) {
     siScores.innerHTML = players.slice(0, 10).map(p =>
@@ -59,32 +96,28 @@ socket.on('leaderboard', (players) => {
         <span>${p.name}</span>
         <span style="color:#e94560;font-weight:600">${p.score}</span>
       </div>`
-    ).join('') || '<p style="color:#555;font-size:0.85rem">No players</p>';
+    ).join('') || '<p style="color:#555;font-size:0.85rem">No scores</p>';
   }
-});
+}
 
 // ============ Space Invaders Display ============
 const siCanvas = document.getElementById('si-canvas');
 const siCtx = siCanvas.getContext('2d');
 let siState = { invaders: [], gameOver: false, running: false, gridRows: 12, gridCols: 8 };
 
-// Load sample images for rendering invaders
 let sampleImages = {};
 fetch('/model/samples.json')
   .then(r => r.json())
   .then(data => { sampleImages = data; })
   .catch(() => {});
 
-// Pre-render doodle images
 const imageCache = {};
 function getDoodleImage(category) {
-  const key = category;
-  if (imageCache[key]) return imageCache[key];
+  if (imageCache[category]) return imageCache[category];
   if (!sampleImages[category] || sampleImages[category].length === 0) return null;
-  const b64 = sampleImages[category][0];
   const img = new Image();
-  img.src = 'data:image/png;base64,' + b64;
-  imageCache[key] = img;
+  img.src = 'data:image/png;base64,' + sampleImages[category][0];
+  imageCache[category] = img;
   return img;
 }
 
@@ -97,22 +130,16 @@ function renderSpaceInvaders() {
   siCtx.fillStyle = '#0a0a1a';
   siCtx.fillRect(0, 0, W, H);
 
-  // Draw grid lines (subtle)
+  // Grid lines
   siCtx.strokeStyle = 'rgba(255,255,255,0.03)';
   for (let c = 1; c < siState.gridCols; c++) {
-    siCtx.beginPath();
-    siCtx.moveTo(c * cellW, 0);
-    siCtx.lineTo(c * cellW, H);
-    siCtx.stroke();
+    siCtx.beginPath(); siCtx.moveTo(c * cellW, 0); siCtx.lineTo(c * cellW, H); siCtx.stroke();
   }
   for (let r = 1; r < siState.gridRows; r++) {
-    siCtx.beginPath();
-    siCtx.moveTo(0, r * cellH);
-    siCtx.lineTo(W, r * cellH);
-    siCtx.stroke();
+    siCtx.beginPath(); siCtx.moveTo(0, r * cellH); siCtx.lineTo(W, r * cellH); siCtx.stroke();
   }
 
-  // Draw bottom line (danger zone)
+  // Danger line
   siCtx.strokeStyle = '#e94560';
   siCtx.lineWidth = 2;
   siCtx.setLineDash([8, 4]);
@@ -123,37 +150,31 @@ function renderSpaceInvaders() {
   siCtx.setLineDash([]);
   siCtx.lineWidth = 1;
 
-  // Draw invaders
+  // Invaders
   for (const inv of siState.invaders) {
     const x = inv.col * cellW;
     const y = inv.row * cellH;
-    const padding = 4;
+    const pad = 4;
 
-    // Background
     siCtx.fillStyle = 'rgba(233, 69, 96, 0.15)';
-    siCtx.fillRect(x + padding, y + padding, cellW - padding * 2, cellH - padding * 2);
+    siCtx.fillRect(x + pad, y + pad, cellW - pad * 2, cellH - pad * 2);
     siCtx.strokeStyle = 'rgba(233, 69, 96, 0.4)';
-    siCtx.strokeRect(x + padding, y + padding, cellW - padding * 2, cellH - padding * 2);
+    siCtx.strokeRect(x + pad, y + pad, cellW - pad * 2, cellH - pad * 2);
 
-    // Doodle image
     const img = getDoodleImage(inv.category);
     if (img && img.complete) {
-      const imgSize = Math.min(cellW, cellH) - padding * 4;
-      const imgX = x + (cellW - imgSize) / 2;
-      const imgY = y + padding * 2;
-      siCtx.drawImage(img, imgX, imgY, imgSize, imgSize * 0.7);
+      const imgSize = Math.min(cellW, cellH) - pad * 4;
+      siCtx.drawImage(img, x + (cellW - imgSize) / 2, y + pad * 2, imgSize, imgSize * 0.7);
     }
 
-    // Category label
     siCtx.fillStyle = '#eee';
     siCtx.font = `bold ${Math.max(10, cellW / 8)}px sans-serif`;
     siCtx.textAlign = 'center';
-    siCtx.fillText(inv.category, x + cellW / 2, y + cellH - padding * 2);
+    siCtx.fillText(inv.category, x + cellW / 2, y + cellH - pad * 2);
   }
 
-  // "Spaceship" at bottom
-  const shipX = W / 2;
-  const shipY = H - 15;
+  // Spaceship
+  const shipX = W / 2, shipY = H - 15;
   siCtx.fillStyle = '#2ecc71';
   siCtx.beginPath();
   siCtx.moveTo(shipX, shipY - 20);
@@ -162,42 +183,34 @@ function renderSpaceInvaders() {
   siCtx.closePath();
   siCtx.fill();
 
-  // Game status
-  if (!siState.running && !siState.gameOver) {
-    siCtx.fillStyle = 'rgba(255,255,255,0.5)';
-    siCtx.font = 'bold 32px sans-serif';
+  // Game over overlay
+  if (siState.gameOver) {
+    siCtx.fillStyle = 'rgba(0,0,0,0.6)';
+    siCtx.fillRect(0, 0, W, H);
+    siCtx.fillStyle = '#e94560';
+    siCtx.font = 'bold 48px sans-serif';
     siCtx.textAlign = 'center';
-    siCtx.fillText('Press Start to begin', W / 2, H / 2);
+    siCtx.fillText('GAME OVER', W / 2, H / 2);
+    siCtx.fillStyle = '#888';
+    siCtx.font = '20px sans-serif';
+    siCtx.fillText('Press Start to play again', W / 2, H / 2 + 40);
   }
 }
 
 socket.on('si-state', (state) => {
   siState = state;
-  document.getElementById('si-game-over').style.display = state.gameOver ? 'flex' : 'none';
-  document.getElementById('si-start').style.display = state.running ? 'none' : '';
-  document.getElementById('si-stop').style.display = state.running ? '' : 'none';
   renderSpaceInvaders();
 });
 
-// Hit feed
 socket.on('si-hit', ({ playerName, category }) => {
   const feed = document.getElementById('si-feed');
   const entry = document.createElement('div');
   entry.textContent = `${playerName} shot ${category}!`;
   feed.prepend(entry);
-  // Keep max 20 entries
   while (feed.children.length > 20) feed.lastChild.remove();
 });
 
-// Controls
-document.getElementById('si-start').addEventListener('click', () => {
-  socket.emit('si-start');
-});
-
-document.getElementById('si-stop').addEventListener('click', () => {
-  socket.emit('si-stop');
-});
-
+// SI config controls
 document.getElementById('si-difficulty').addEventListener('change', (e) => {
   socket.emit('si-config', { difficulty: parseFloat(e.target.value) });
 });
@@ -211,5 +224,5 @@ document.getElementById('si-speed').addEventListener('change', (e) => {
   socket.emit('si-config', speeds[e.target.value]);
 });
 
-// Render loop for smooth animation
+// Render loop
 setInterval(renderSpaceInvaders, 50);

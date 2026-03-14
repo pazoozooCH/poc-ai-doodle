@@ -7,12 +7,12 @@ const app = express();
 const http = createServer(app);
 const io = new Server(http);
 
-// Server info endpoint
+// Server info
 const startupTime = new Date().toISOString();
 let gitCommit = 'unknown';
 try {
   gitCommit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
-} catch (e) { /* not a git repo */ }
+} catch (e) {}
 
 function getNetworkUrl() {
   const nets = require('os').networkInterfaces();
@@ -28,7 +28,7 @@ app.get('/api/info', (req, res) => {
 app.use(express.static('public'));
 app.use('/slides', express.static('slides'));
 
-// ============ Shared state ============
+// ============ State ============
 
 const WORD_LIST = [
   'cat', 'dog', 'house', 'car', 'tree', 'fish', 'bird', 'sun', 'moon', 'star',
@@ -36,108 +36,18 @@ const WORD_LIST = [
   'apple', 'banana', 'clock', 'skull', 'smiley face', 'umbrella', 'lightning'
 ];
 
-const players = new Map();
+const players = new Map(); // socketId -> { name, score, streak, round, connected }
 const customCategories = {};
 
-// ============ Game mode ============
+let gameMode = 'quick-draw';   // 'quick-draw' | 'space-invaders'
+let gameState = 'lobby';       // 'lobby' | 'playing'
 
-let gameMode = 'quick-draw'; // 'quick-draw' | 'space-invaders'
+// ============ Helpers ============
 
-// --- Quick Draw config ---
-const QUICK_DRAW = { timeLimit: 20, numRounds: 10 };
-
-function shuffleWords() {
-  const shuffled = [...WORD_LIST].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, QUICK_DRAW.numRounds);
-}
-
-// --- Space Invaders state ---
-const SPACE_INVADERS = {
-  difficulty: 0.5,        // confidence threshold (0-1)
-  spawnInterval: 3000,    // ms between spawns
-  moveInterval: 500,      // ms between moves
-  invaderSpeed: 1,        // rows per move
-  gridRows: 12,           // grid height
-  gridCols: 8,            // grid width
-  hitBonus: 100,
-  missPenalty: -30,
-  gameOver: false,
-};
-
-let invaders = [];       // { id, category, col, row, alive, image (base64 index) }
-let invaderIdCounter = 0;
-let spawnTimer = null;
-let moveTimer = null;
-let siRunning = false;
-
-function spawnInvader() {
-  const category = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
-  const col = Math.floor(Math.random() * SPACE_INVADERS.gridCols);
-  const invader = {
-    id: invaderIdCounter++,
-    category,
-    col,
-    row: 0,
-    alive: true,
-  };
-  invaders.push(invader);
-  broadcastSIState();
-}
-
-function moveInvaders() {
-  let gameOver = false;
-  for (const inv of invaders) {
-    if (!inv.alive) continue;
-    inv.row += SPACE_INVADERS.invaderSpeed;
-    if (inv.row >= SPACE_INVADERS.gridRows) {
-      gameOver = true;
-    }
-  }
-  // Remove off-screen invaders
-  invaders = invaders.filter(inv => inv.row < SPACE_INVADERS.gridRows + 2);
-
-  if (gameOver) {
-    stopSpaceInvaders();
-    SPACE_INVADERS.gameOver = true;
-  }
-  broadcastSIState();
-}
-
-function startSpaceInvaders() {
-  invaders = [];
-  invaderIdCounter = 0;
-  SPACE_INVADERS.gameOver = false;
-  siRunning = true;
-
-  // Reset player scores
-  for (const [, player] of players) {
-    player.score = 0;
-    player.streak = 0;
-  }
-
-  spawnTimer = setInterval(spawnInvader, SPACE_INVADERS.spawnInterval);
-  moveTimer = setInterval(moveInvaders, SPACE_INVADERS.moveInterval);
-  broadcastSIState();
-  io.emit('leaderboard', getLeaderboard());
-}
-
-function stopSpaceInvaders() {
-  siRunning = false;
-  clearInterval(spawnTimer);
-  clearInterval(moveTimer);
-  spawnTimer = null;
-  moveTimer = null;
-}
-
-function broadcastSIState() {
-  io.emit('si-state', {
-    invaders: invaders.filter(inv => inv.alive),
-    gameOver: SPACE_INVADERS.gameOver,
-    difficulty: SPACE_INVADERS.difficulty,
-    gridRows: SPACE_INVADERS.gridRows,
-    gridCols: SPACE_INVADERS.gridCols,
-    running: siRunning,
-  });
+function getPlayerList() {
+  return Array.from(players.values())
+    .filter(p => p.connected)
+    .map(p => ({ name: p.name, score: p.score }));
 }
 
 function getLeaderboard() {
@@ -154,47 +64,204 @@ function getLeaderboard() {
     }));
 }
 
+function broadcastFullState() {
+  io.emit('full-state', {
+    gameMode,
+    gameState,
+    players: getPlayerList(),
+    leaderboard: getLeaderboard(),
+  });
+}
+
+// ============ Quick Draw ============
+
+const QUICK_DRAW = { timeLimit: 20, numRounds: 10 };
+
+function shuffleWords() {
+  const shuffled = [...WORD_LIST].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, QUICK_DRAW.numRounds);
+}
+
+function startQuickDraw() {
+  gameState = 'playing';
+  // Reset scores and assign words per player
+  for (const [socketId, player] of players) {
+    player.score = 0;
+    player.streak = 0;
+    player.round = 0;
+    player.words = shuffleWords();
+    const sock = io.sockets.sockets.get(socketId);
+    if (sock && player.connected) {
+      sock.emit('qd-start', {
+        words: player.words,
+        timeLimit: QUICK_DRAW.timeLimit,
+        numRounds: QUICK_DRAW.numRounds,
+      });
+    }
+  }
+  broadcastFullState();
+}
+
+// ============ Space Invaders ============
+
+const SI_CONFIG = {
+  difficulty: 0.5,
+  spawnInterval: 3000,
+  moveInterval: 500,
+  invaderSpeed: 1,
+  gridRows: 12,
+  gridCols: 8,
+  hitBonus: 100,
+  missPenalty: -30,
+};
+
+let invaders = [];
+let invaderIdCounter = 0;
+let spawnTimer = null;
+let moveTimer = null;
+let siGameOver = false;
+
+function spawnInvader() {
+  const category = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+  const col = Math.floor(Math.random() * SI_CONFIG.gridCols);
+  invaders.push({
+    id: invaderIdCounter++,
+    category,
+    col,
+    row: 0,
+    alive: true,
+  });
+  broadcastSIState();
+}
+
+function moveInvaders() {
+  let reachedBottom = false;
+  for (const inv of invaders) {
+    if (!inv.alive) continue;
+    inv.row += SI_CONFIG.invaderSpeed;
+    if (inv.row >= SI_CONFIG.gridRows) reachedBottom = true;
+  }
+  invaders = invaders.filter(inv => inv.row < SI_CONFIG.gridRows + 2);
+
+  if (reachedBottom) {
+    siGameOver = true;
+    stopSITimers();
+    gameState = 'lobby';
+  }
+  broadcastSIState();
+  if (reachedBottom) broadcastFullState();
+}
+
+function startSpaceInvaders() {
+  gameState = 'playing';
+  invaders = [];
+  invaderIdCounter = 0;
+  siGameOver = false;
+
+  for (const [, player] of players) {
+    player.score = 0;
+    player.streak = 0;
+  }
+
+  spawnTimer = setInterval(spawnInvader, SI_CONFIG.spawnInterval);
+  moveTimer = setInterval(moveInvaders, SI_CONFIG.moveInterval);
+  broadcastSIState();
+  broadcastFullState();
+}
+
+function stopSITimers() {
+  clearInterval(spawnTimer);
+  clearInterval(moveTimer);
+  spawnTimer = null;
+  moveTimer = null;
+}
+
+function broadcastSIState() {
+  io.emit('si-state', {
+    invaders: invaders.filter(inv => inv.alive),
+    gameOver: siGameOver,
+    difficulty: SI_CONFIG.difficulty,
+    gridRows: SI_CONFIG.gridRows,
+    gridCols: SI_CONFIG.gridCols,
+    running: gameState === 'playing' && gameMode === 'space-invaders',
+  });
+}
+
 // ============ Socket handlers ============
 
 io.on('connection', (socket) => {
   console.log(`Connected: ${socket.id}`);
 
-  // Send current game mode
-  socket.emit('game-mode', gameMode);
+  // Send full state on connect
+  socket.emit('full-state', {
+    gameMode,
+    gameState,
+    players: getPlayerList(),
+    leaderboard: getLeaderboard(),
+  });
 
+  // Player joins
   socket.on('join', (name) => {
+    if (!name || typeof name !== 'string') return;
     players.set(socket.id, {
-      name,
+      name: name.trim(),
       score: 0,
       streak: 0,
       round: 0,
       connected: true,
-      words: shuffleWords(),
+      words: [],
     });
+    broadcastFullState();
+    console.log(`${name} joined`);
 
-    if (gameMode === 'quick-draw') {
+    // If a Quick Draw game is already running, send them their words
+    if (gameState === 'playing' && gameMode === 'quick-draw') {
       const player = players.get(socket.id);
-      socket.emit('game-config', {
+      player.words = shuffleWords();
+      socket.emit('qd-start', {
         words: player.words,
         timeLimit: QUICK_DRAW.timeLimit,
         numRounds: QUICK_DRAW.numRounds,
-        mode: 'quick-draw',
-      });
-    } else {
-      socket.emit('game-config', {
-        mode: 'space-invaders',
-        difficulty: SPACE_INVADERS.difficulty,
       });
     }
-
-    io.emit('leaderboard', getLeaderboard());
-    console.log(`${name} joined (mode: ${gameMode})`);
+    // If Space Invaders is running, send current state
+    if (gameState === 'playing' && gameMode === 'space-invaders') {
+      broadcastSIState();
+    }
   });
 
-  // Quick Draw round result
+  // Host: start game
+  socket.on('start-game', () => {
+    console.log(`Starting ${gameMode}...`);
+    if (gameMode === 'quick-draw') startQuickDraw();
+    else if (gameMode === 'space-invaders') startSpaceInvaders();
+  });
+
+  // Host: switch mode (goes back to lobby)
+  socket.on('set-game-mode', (mode) => {
+    if (mode !== 'quick-draw' && mode !== 'space-invaders') return;
+    if (gameMode === 'space-invaders') stopSITimers();
+    gameMode = mode;
+    gameState = 'lobby';
+    siGameOver = false;
+    broadcastFullState();
+    console.log(`Mode changed to: ${gameMode}`);
+  });
+
+  // Host: stop game (back to lobby)
+  socket.on('stop-game', () => {
+    if (gameMode === 'space-invaders') stopSITimers();
+    gameState = 'lobby';
+    siGameOver = false;
+    broadcastFullState();
+    broadcastSIState();
+    console.log('Game stopped, back to lobby');
+  });
+
+  // Quick Draw: round result
   socket.on('round-result', ({ success, timeTaken }) => {
     const player = players.get(socket.id);
-    if (!player || gameMode !== 'quick-draw') return;
+    if (!player || gameMode !== 'quick-draw' || gameState !== 'playing') return;
 
     if (success) {
       player.streak++;
@@ -205,84 +272,63 @@ io.on('connection', (socket) => {
       player.streak = 0;
     }
     player.round++;
-    io.emit('leaderboard', getLeaderboard());
+    broadcastFullState();
   });
 
-  // Space Invaders: player submits a classification
+  // Space Invaders: player shoots
   socket.on('si-shoot', ({ category, confidence }) => {
     const player = players.get(socket.id);
-    if (!player || gameMode !== 'space-invaders' || !siRunning) return;
+    if (!player || gameMode !== 'space-invaders' || gameState !== 'playing') return;
 
-    // Find the lowest alive invader matching this category
     const matchingInvaders = invaders
       .filter(inv => inv.alive && inv.category === category)
-      .sort((a, b) => b.row - a.row); // lowest (closest to bottom) first
+      .sort((a, b) => b.row - a.row);
 
-    if (matchingInvaders.length > 0 && confidence >= SPACE_INVADERS.difficulty) {
+    if (matchingInvaders.length > 0 && confidence >= SI_CONFIG.difficulty) {
       const target = matchingInvaders[0];
       target.alive = false;
-      player.score += SPACE_INVADERS.hitBonus;
+      player.score += SI_CONFIG.hitBonus;
       player.streak++;
       io.emit('si-hit', {
         invaderId: target.id,
         playerName: player.name,
         category: target.category,
       });
+      broadcastFullState();
+      broadcastSIState();
       console.log(`${player.name} shot ${target.category} (${(confidence * 100).toFixed(0)}%)`);
     } else {
-      // Miss: no matching invader on screen or confidence too low
-      player.score += SPACE_INVADERS.missPenalty;
+      player.score += SI_CONFIG.missPenalty;
       player.streak = 0;
-      socket.emit('si-miss', { category, reason: matchingInvaders.length === 0 ? 'not-on-screen' : 'too-low' });
-    }
-
-    io.emit('leaderboard', getLeaderboard());
-    broadcastSIState();
-  });
-
-  // Game mode switching (from leaderboard/host)
-  socket.on('set-game-mode', (mode) => {
-    if (mode === 'quick-draw' || mode === 'space-invaders') {
-      if (gameMode === 'space-invaders') stopSpaceInvaders();
-      gameMode = mode;
-      io.emit('game-mode', gameMode);
-      console.log(`Game mode changed to: ${gameMode}`);
+      socket.emit('si-miss', {
+        category,
+        reason: matchingInvaders.length === 0 ? 'not-on-screen' : 'too-low'
+      });
+      broadcastFullState();
     }
   });
 
-  socket.on('si-start', () => {
-    if (gameMode === 'space-invaders') {
-      startSpaceInvaders();
-      console.log('Space Invaders started');
-    }
-  });
-
-  socket.on('si-stop', () => {
-    stopSpaceInvaders();
-    broadcastSIState();
-    console.log('Space Invaders stopped');
-  });
-
+  // Space Invaders: config changes
   socket.on('si-config', (config) => {
-    if (config.difficulty !== undefined) SPACE_INVADERS.difficulty = config.difficulty;
+    if (config.difficulty !== undefined) SI_CONFIG.difficulty = config.difficulty;
     if (config.spawnInterval !== undefined) {
-      SPACE_INVADERS.spawnInterval = config.spawnInterval;
+      SI_CONFIG.spawnInterval = config.spawnInterval;
       if (spawnTimer) {
         clearInterval(spawnTimer);
-        spawnTimer = setInterval(spawnInvader, SPACE_INVADERS.spawnInterval);
+        spawnTimer = setInterval(spawnInvader, SI_CONFIG.spawnInterval);
       }
     }
     if (config.moveInterval !== undefined) {
-      SPACE_INVADERS.moveInterval = config.moveInterval;
+      SI_CONFIG.moveInterval = config.moveInterval;
       if (moveTimer) {
         clearInterval(moveTimer);
-        moveTimer = setInterval(moveInvaders, SPACE_INVADERS.moveInterval);
+        moveTimer = setInterval(moveInvaders, SI_CONFIG.moveInterval);
       }
     }
     broadcastSIState();
   });
 
-  // Custom category training
+  // Custom categories
   socket.on('get-custom-categories', () => {
     socket.emit('custom-categories', customCategories);
   });
@@ -290,9 +336,7 @@ io.on('connection', (socket) => {
   socket.on('add-sample', (data) => {
     const { category, features } = data || {};
     if (!category || !features || features.length !== 128) return;
-    if (!customCategories[category]) {
-      customCategories[category] = { samples: [] };
-    }
+    if (!customCategories[category]) customCategories[category] = { samples: [] };
     customCategories[category].samples.push(features);
     io.emit('custom-categories', customCategories);
     console.log(`Custom category "${category}" now has ${customCategories[category].samples.length} samples`);
@@ -309,7 +353,7 @@ io.on('connection', (socket) => {
     const player = players.get(socket.id);
     if (player) {
       player.connected = false;
-      io.emit('leaderboard', getLeaderboard());
+      broadcastFullState();
       console.log(`${player.name} disconnected`);
     }
   });
@@ -317,11 +361,8 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
-  const nets = require('os').networkInterfaces();
-  const localIp = Object.values(nets).flat()
-    .find(n => n.family === 'IPv4' && !n.internal)?.address || 'localhost';
   console.log(`Server running on:`);
   console.log(`  Local:   http://localhost:${PORT}`);
-  console.log(`  Network: http://${localIp}:${PORT}`);
-  console.log(`  Leaderboard: http://${localIp}:${PORT}/leaderboard.html`);
+  console.log(`  Network: ${getNetworkUrl()}`);
+  console.log(`  Leaderboard: ${getNetworkUrl()}/leaderboard.html`);
 });

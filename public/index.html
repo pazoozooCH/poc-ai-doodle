@@ -123,15 +123,12 @@
       const name = document.getElementById('player-name').value.trim();
       if (!name) return;
       sessionStorage.setItem('playerName', name);
-      socket.emit('join', name);
-    });
-    socket.on('game-config', (config) => {
-      sessionStorage.setItem('gameConfig', JSON.stringify(config));
+      // Go directly to game page — lobby handles the rest
       window.location.href = '/game.html';
     });
 
     // Mini leaderboard
-    socket.on('leaderboard', (players) => {
+    socket.on('full-state', ({ leaderboard: players }) => {
       const container = document.getElementById('mini-lb');
       if (players.length === 0) {
         container.innerHTML = '<p class="mini-leaderboard-empty">No players yet</p>';
