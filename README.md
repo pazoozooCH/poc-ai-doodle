@@ -20,7 +20,6 @@ Open `slides/index.html` in a browser (static file, no server needed). Requires 
 | Right / Left | Move between main topics |
 | Down / Up | Sub-slides within a topic |
 | Esc | Overview mode (bird's eye) |
-| Alt+Click | Zoom into any element |
 | Space | Next slide (linear) |
 
 ---
