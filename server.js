@@ -7,6 +7,7 @@ const http = createServer(app);
 const io = new Server(http);
 
 app.use(express.static('public'));
+app.use('/slides', express.static('slides'));
 
 const WORD_LIST = [
   'cat', 'dog', 'house', 'car', 'tree', 'fish', 'bird', 'sun', 'moon', 'star',
