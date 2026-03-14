@@ -29,6 +29,7 @@ stopBtn.addEventListener('click', () => {
 
 // ============ Full state updates ============
 socket.on('full-state', ({ gameMode, gameState, players, leaderboard }) => {
+  console.log('full-state:', gameMode, gameState, 'players:', players.length);
   currentMode = gameMode;
   currentState = gameState;
 
@@ -105,8 +106,9 @@ function updateLeaderboard(players) {
 
 // ============ Space Invaders Display ============
 const siCanvas = document.getElementById('si-canvas');
-const siCtx = siCanvas.getContext('2d');
-let siState = { invaders: [], gameOver: false, running: false, gridRows: 12, gridCols: 8 };
+const siCtx = siCanvas ? siCanvas.getContext('2d') : null;
+let siState = { invaders: [], gameOver: false, running: false, gridRows: 10, gridCols: 6 };
+console.log('SI canvas found:', !!siCanvas);
 
 let sampleImages = {};
 fetch('/model/samples.json')
@@ -125,6 +127,7 @@ function getDoodleImage(category) {
 }
 
 function renderSpaceInvaders() {
+  if (!siCanvas || !siCtx) return;
   const W = siCanvas.width;
   const H = siCanvas.height;
   const cellW = W / siState.gridCols;

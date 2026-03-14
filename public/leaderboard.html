@@ -87,16 +87,6 @@
       border-bottom: 1px solid #1a1a2e;
     }
 
-    .si-game-over {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0.7);
-      border-radius: 8px;
-    }
-    .si-game-over h2 { color: #e94560; font-size: 3rem; }
 
     /* QR Code overlay */
     .qr-toggle {
@@ -192,11 +182,8 @@
       </div>
 
       <div class="si-sidebar">
-        <div class="si-game-area" style="position:relative">
+        <div class="si-game-area">
           <canvas id="si-canvas" width="800" height="600"></canvas>
-          <div class="si-game-over" id="si-game-over" style="display:none">
-            <h2>GAME OVER</h2>
-          </div>
         </div>
         <div class="si-leaderboard-area">
           <h3>Scores</h3>
