@@ -9,6 +9,22 @@
 /plugin install frontend-design@claude-code-plugins
 ```
 
+## Slides
+
+Open `slides/index.html` in a browser (static file, no server needed). Requires the doodle server running for embedded live demos.
+
+### Navigation
+
+| Key | Action |
+|---|---|
+| Right / Left | Move between main topics |
+| Down / Up | Sub-slides within a topic |
+| Esc | Overview mode (bird's eye) |
+| Alt+Click | Zoom into any element |
+| Space | Next slide (linear) |
+
+---
+
 ## Plan
 
 ### Demo 1: Doodle Challenge (~15-20 min)
