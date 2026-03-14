@@ -5,7 +5,7 @@ import { initFooter } from './shared/footer.js';
 initFooter();
 import {
   loadModels, classify, classifyRaw, getCustomScores,
-  syncCustomCategories, LABELS, getMainModel
+  syncCustomCategories, LABELS, getMainModel, getLoadErrorMessage
 } from './shared/model.js';
 
 const socket = io();
@@ -359,7 +359,7 @@ async function init() {
     classifyInterval = setInterval(runClassify, 300);
   } catch (err) {
     document.getElementById('loading').innerHTML =
-      `<p style="color:#e94560">Failed to load model.</p>`;
+      `<p style="color:#e94560">${getLoadErrorMessage(err)}</p>`;
     console.error(err);
   }
 }

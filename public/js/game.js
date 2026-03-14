@@ -1,6 +1,6 @@
 import { initCanvas } from './shared/canvas.js';
 import { preprocessCanvas } from './shared/preprocessing.js';
-import { loadModels, classify, syncCustomCategories, LABELS } from './shared/model.js';
+import { loadModels, classify, syncCustomCategories, LABELS, getLoadErrorMessage } from './shared/model.js';
 import { initFooter } from './shared/footer.js';
 initFooter();
 
@@ -276,8 +276,7 @@ async function init() {
     currentView = 'lobby';
   } catch (err) {
     document.getElementById('loading').innerHTML =
-      `<p style="color:#e94560">Failed to load model. Make sure you've trained it first.<br>
-       Run: <code>cd train && .venv/bin/python train_model.py</code></p>`;
+      `<p style="color:#e94560">${getLoadErrorMessage(err)}</p>`;
     console.error(err);
   }
 }

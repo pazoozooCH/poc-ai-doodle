@@ -1,6 +1,6 @@
 import { initCanvas } from './shared/canvas.js';
 import { preprocessCanvas } from './shared/preprocessing.js';
-import { loadModels, extractFeatures } from './shared/model.js';
+import { loadModels, extractFeatures, getLoadErrorMessage } from './shared/model.js';
 import { initFooter } from './shared/footer.js';
 initFooter();
 
@@ -113,7 +113,7 @@ async function init() {
     document.getElementById('app').style.display = 'block';
   } catch (err) {
     document.getElementById('loading').innerHTML =
-      `<p style="color:#e94560">Failed to load feature extractor model.</p>`;
+      `<p style="color:#e94560">${getLoadErrorMessage(err)}</p>`;
     console.error(err);
   }
 }

@@ -45,6 +45,21 @@ export async function loadModels({ main = true, features = false } = {}) {
 }
 
 /**
+ * User-friendly error message for model loading failures.
+ */
+export function getLoadErrorMessage(err) {
+  const msg = err?.message || String(err);
+  if (msg.includes('protobuf') || msg.includes('WASM') || msg.includes('SharedArrayBuffer')) {
+    return `Your browser doesn't support the AI model.<br>
+      Please use a modern browser (Chrome, Firefox, Edge, or Safari 16+).`;
+  }
+  if (msg.includes('fetch') || msg.includes('NetworkError') || msg.includes('404')) {
+    return `Could not download the AI model.<br>Check your network connection.`;
+  }
+  return `Failed to load AI model.<br><span style="font-size:0.8rem;color:#888">${msg}</span>`;
+}
+
+/**
  * Run classification on a preprocessed tensor.
  * Returns sorted array of { label, prob }.
  */
