@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/favicon.png">
   <title>AI Lunch Demo - InfTec</title>
   <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/reveal.css">
   <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/theme/black.css">
@@ -43,11 +44,53 @@
       z-index: 10;
     }
 
+    .reveal .slide-clock {
+      position: fixed;
+      top: 25px;
+      right: 30px;
+      font-size: 1.1rem;
+      color: var(--inftec-light);
+      opacity: 0.6;
+      z-index: 10;
+      font-variant-numeric: tabular-nums;
+    }
+
     .reveal a { color: var(--inftec-orange); }
     .reveal a:hover { color: var(--inftec-yellow); }
     .reveal .slide-number { color: var(--inftec-light); }
     .reveal .progress { color: var(--inftec-orange); }
     .reveal .controls { color: var(--inftec-orange); }
+
+    /* iframe slides: heading bar + iframe below */
+    .iframe-slide {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .iframe-slide h3 {
+      margin: 0;
+      padding: 15px 20px 10px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .iframe-slide iframe {
+      flex: 1;
+      border: none;
+      border-radius: 8px;
+      margin: 0 20px 20px;
+    }
+
+    /* Click shield to capture clicks and refocus for keyboard nav */
+    .iframe-focus-shield {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      z-index: 5;
+      cursor: default;
+    }
   </style>
 </head>
 <body>
@@ -109,7 +152,12 @@ Open on your phone:
 `http://???:3000`
         </textarea></section>
 
-        <section data-background-iframe="http://localhost:3000/leaderboard.html" data-background-interactive>
+        <section>
+          <div class="iframe-slide">
+            <h3>Leaderboard</h3>
+            <iframe src="http://localhost:3000/leaderboard.html"></iframe>
+            <div class="iframe-focus-shield"></div>
+          </div>
         </section>
 
         <section data-markdown><textarea data-template>
@@ -121,7 +169,12 @@ What does the AI see when you draw?
 - Debug preview: the 28x28 pixels the model actually sees
         </textarea></section>
 
-        <section data-background-iframe="http://localhost:3000/freedraw.html" data-background-interactive>
+        <section>
+          <div class="iframe-slide">
+            <h3>Free Drawing</h3>
+            <iframe src="http://localhost:3000/freedraw.html"></iframe>
+            <div class="iframe-focus-shield"></div>
+          </div>
         </section>
 
         <section data-markdown><textarea data-template>
@@ -145,7 +198,12 @@ Transfer learning with KNN on the feature space
 - Shared across all participants via WebSocket
         </textarea></section>
 
-        <section data-background-iframe="http://localhost:3000/train.html" data-background-interactive>
+        <section>
+          <div class="iframe-slide">
+            <h3>Train Custom Categories</h3>
+            <iframe src="http://localhost:3000/train.html"></iframe>
+            <div class="iframe-focus-shield"></div>
+          </div>
         </section>
 
         <section data-markdown><textarea data-template>
@@ -207,6 +265,7 @@ AI-assisted software development
 
     </div>
     <img src="logo.png" class="slide-logo" alt="InfTec">
+    <div class="slide-clock" id="clock"></div>
   </div>
 
   <script src="https://unpkg.com/reveal.js@4/dist/reveal.js"></script>
@@ -221,6 +280,43 @@ AI-assisted software development
       progress: true,
       width: 1280,
       height: 720
+    });
+
+    // Clock
+    const clockEl = document.getElementById('clock');
+    function updateClock() {
+      const now = new Date();
+      clockEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    updateClock();
+    setInterval(updateClock, 10000);
+
+    // Focus shields: clicking the top bar of iframe slides refocuses reveal for keyboard nav
+    document.querySelectorAll('.iframe-focus-shield').forEach(shield => {
+      shield.addEventListener('click', () => {
+        document.querySelector('.reveal').focus();
+      });
+    });
+
+    // Also: pressing Escape in an iframe should refocus reveal
+    window.addEventListener('message', (e) => {
+      if (e.data === 'focus-parent') document.querySelector('.reveal').focus();
+    });
+
+    // Global key handler: if arrow keys are pressed while iframe has focus, navigate
+    window.addEventListener('keydown', (e) => {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape'].includes(e.key)) {
+        // Check if an iframe has focus
+        if (document.activeElement && document.activeElement.tagName === 'IFRAME') {
+          document.querySelector('.reveal').focus();
+          // Re-dispatch the key event to reveal
+          if (e.key === 'ArrowRight') Reveal.next();
+          else if (e.key === 'ArrowLeft') Reveal.prev();
+          else if (e.key === 'ArrowDown') Reveal.down();
+          else if (e.key === 'ArrowUp') Reveal.up();
+          else if (e.key === 'Escape') Reveal.toggleOverview();
+        }
+      }
     });
   </script>
 </body>
