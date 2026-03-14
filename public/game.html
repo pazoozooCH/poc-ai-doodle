@@ -33,14 +33,6 @@
     .si-feedback.hit { color: #2ecc71; }
     .si-feedback.miss { color: #e94560; }
 
-    /* Particle overlay */
-    #particle-canvas {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 200;
-    }
-
     /* Hit/miss flash */
     .flash-overlay {
       position: fixed;
@@ -140,7 +132,7 @@
     <div class="result-content" id="round-result-text"></div>
   </div>
 
-  <canvas id="particle-canvas"></canvas>
+  <canvas id="particle-canvas" style="position:fixed;inset:0;pointer-events:none;z-index:200"></canvas>
   <div class="flash-overlay" id="flash-overlay"></div>
 
   <script src="/socket.io/socket.io.js"></script>
