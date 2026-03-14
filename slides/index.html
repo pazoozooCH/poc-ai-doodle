@@ -20,8 +20,9 @@
       color: var(--inftec-light);
     }
 
-    .reveal .slides { background: var(--inftec-dark); }
+    .reveal, .reveal .slides, .reveal .slide-background { background: var(--inftec-dark); }
     body { background: var(--inftec-dark); }
+    .reveal .slide-background { background-color: var(--inftec-dark) !important; }
 
     .reveal h1, .reveal h2, .reveal h3 {
       text-transform: none;
@@ -41,8 +42,9 @@
       top: 20px;
       left: 30px;
       height: 28px;
-      opacity: 0.7;
+      opacity: 0.85;
       z-index: 10;
+      filter: brightness(2);
     }
 
     .reveal a { color: var(--inftec-orange); }
