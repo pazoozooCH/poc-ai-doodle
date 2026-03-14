@@ -6,6 +6,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Doodle Challenge - Play</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Space Invaders player view */
+    .si-invader-list {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 10px;
+    }
+    .si-invader-tag {
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(233, 69, 96, 0.2);
+      border: 1px solid rgba(233, 69, 96, 0.4);
+      font-size: 0.85rem;
+      color: #eee;
+    }
+    .si-feedback {
+      text-align: center;
+      padding: 10px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      min-height: 2em;
+    }
+    .si-feedback.hit { color: #2ecc71; }
+    .si-feedback.miss { color: #e94560; }
+  </style>
 </head>
 <body>
   <div id="loading" class="model-loading">
@@ -13,6 +40,7 @@
     <p>Loading AI model...</p>
   </div>
 
+  <!-- Quick Draw mode -->
   <div id="game" style="display:none">
     <div class="game-header">
       <div class="score-display">
@@ -37,6 +65,36 @@
     <div class="game-controls">
       <button class="btn-clear" id="btn-clear">Clear</button>
       <img id="debug-preview" width="56" height="56" style="border:1px solid #333;border-radius:4px;image-rendering:pixelated;display:none" title="What the model sees">
+    </div>
+  </div>
+
+  <!-- Space Invaders mode -->
+  <div id="si-game" style="display:none">
+    <div class="game-header">
+      <div class="score-display">
+        <span id="si-score">Score: 0</span>
+        <span id="si-streak"></span>
+      </div>
+      <span>Space Invaders</span>
+    </div>
+
+    <div id="si-feedback" class="si-feedback"></div>
+
+    <div style="padding:5px 10px;text-align:center;color:#888;font-size:0.8rem">Draw one of these to shoot it:</div>
+    <div class="si-invader-list" id="si-targets"></div>
+
+    <div class="canvas-wrapper">
+      <canvas id="si-canvas" width="280" height="280"></canvas>
+    </div>
+
+    <div class="predictions" id="si-predictions"></div>
+
+    <div class="game-controls">
+      <button class="btn-clear" id="si-clear">Clear</button>
+    </div>
+
+    <div id="si-waiting" style="text-align:center;padding:20px;color:#888">
+      Waiting for host to start the game...
     </div>
   </div>
 

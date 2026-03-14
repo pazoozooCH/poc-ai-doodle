@@ -6,14 +6,154 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doodle Challenge - Leaderboard</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .mode-switcher {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .mode-btn {
+      padding: 8px 20px;
+      border: 2px solid #333;
+      border-radius: 20px;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .mode-btn.active {
+      border-color: #e94560;
+      color: #eee;
+      background: rgba(233, 69, 96, 0.2);
+    }
+    .mode-btn:hover { border-color: #e94560; }
+
+    /* Space Invaders display */
+    #si-container { display: none; position: relative; }
+    #si-canvas {
+      display: block;
+      margin: 0 auto;
+      background: #0a0a1a;
+      border-radius: 8px;
+    }
+    .si-controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+      margin: 15px 0;
+      flex-wrap: wrap;
+    }
+    .si-controls button {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .si-controls .btn-start { background: #2ecc71; color: #000; }
+    .si-controls .btn-stop { background: #e94560; color: #fff; }
+    .si-controls label { color: #888; font-size: 0.85rem; }
+    .si-controls select, .si-controls input {
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: #16213e;
+      color: #eee;
+      border: 1px solid #333;
+    }
+
+    .si-sidebar {
+      display: flex;
+      gap: 30px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .si-game-area { flex: 3; }
+    .si-leaderboard-area { flex: 1; min-width: 200px; }
+    .si-leaderboard-area h3 { color: #888; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+    .si-hit-feed {
+      margin-top: 15px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .si-hit-feed div {
+      padding: 4px 0;
+      font-size: 0.8rem;
+      color: #2ecc71;
+      border-bottom: 1px solid #1a1a2e;
+    }
+
+    .si-game-over {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.7);
+      border-radius: 8px;
+    }
+    .si-game-over h2 { color: #e94560; font-size: 3rem; }
+  </style>
 </head>
 <body>
   <div class="leaderboard-screen">
     <h1>Doodle Challenge</h1>
-    <div id="leaderboard-content">
-      <p class="no-players">Waiting for players...</p>
+
+    <div class="mode-switcher">
+      <button class="mode-btn active" data-mode="quick-draw">Quick Draw</button>
+      <button class="mode-btn" data-mode="space-invaders">Space Invaders</button>
+    </div>
+
+    <!-- Quick Draw leaderboard -->
+    <div id="qd-container">
+      <div id="leaderboard-content">
+        <p class="no-players">Waiting for players...</p>
+      </div>
+    </div>
+
+    <!-- Space Invaders -->
+    <div id="si-container">
+      <div class="si-controls">
+        <button class="btn-start" id="si-start">Start Game</button>
+        <button class="btn-stop" id="si-stop" style="display:none">Stop</button>
+        <label>Difficulty:
+          <select id="si-difficulty">
+            <option value="0.3">Easy (30%)</option>
+            <option value="0.5" selected>Medium (50%)</option>
+            <option value="0.7">Hard (70%)</option>
+            <option value="0.85">Expert (85%)</option>
+          </select>
+        </label>
+        <label>Speed:
+          <select id="si-speed">
+            <option value="slow">Slow</option>
+            <option value="medium" selected>Medium</option>
+            <option value="fast">Fast</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="si-sidebar">
+        <div class="si-game-area" style="position:relative">
+          <canvas id="si-canvas" width="800" height="600"></canvas>
+          <div class="si-game-over" id="si-game-over" style="display:none">
+            <h2>GAME OVER</h2>
+          </div>
+        </div>
+        <div class="si-leaderboard-area">
+          <h3>Scores</h3>
+          <div id="si-scores"></div>
+          <h3 style="margin-top:20px">Hit Feed</h3>
+          <div class="si-hit-feed" id="si-feed"></div>
+        </div>
+      </div>
     </div>
   </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/leaderboard.js"></script>
   <script type="module">
