@@ -1,3 +1,4 @@
 node_modules/
 train/data/
-public/model/
+train/.venv/
+train/__pycache__/
