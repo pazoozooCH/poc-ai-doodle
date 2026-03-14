@@ -5,6 +5,72 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Doodle Challenge</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      width: 100%;
+      max-width: 400px;
+      margin-top: 25px;
+    }
+    .mode-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 18px 12px;
+      background: #16213e;
+      border: 2px solid #333;
+      border-radius: 12px;
+      color: #eee;
+      text-decoration: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .mode-card:hover {
+      border-color: #e94560;
+      background: #1a2744;
+    }
+    .mode-icon { font-size: 1.8rem; }
+    .mode-label { font-size: 0.95rem; font-weight: 600; }
+    .mode-desc { font-size: 0.75rem; color: #888; }
+    .divider {
+      width: 100%;
+      max-width: 400px;
+      border: none;
+      border-top: 1px solid #333;
+      margin: 10px 0;
+    }
+
+    .mini-leaderboard {
+      width: 100%;
+      max-width: 400px;
+      margin-top: 10px;
+    }
+    .mini-leaderboard h3 {
+      color: #888;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .mini-leaderboard-empty {
+      color: #555;
+      font-size: 0.85rem;
+    }
+    .mini-lb-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: #16213e;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      font-size: 0.9rem;
+    }
+    .mini-lb-rank { color: #888; width: 24px; }
+    .mini-lb-name { flex: 1; }
+    .mini-lb-score { color: #e94560; font-weight: 600; }
+  </style>
 </head>
 <body>
   <div class="container join-screen">
@@ -14,11 +80,40 @@
       <input type="text" id="player-name" placeholder="Enter your name" maxlength="20" autocomplete="off" required>
       <button type="submit">Join Game</button>
     </form>
-    <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
-      <a href="/freedraw.html" style="color:#888;text-decoration:none">Free Drawing</a>
-      <a href="/train.html" style="color:#888;text-decoration:none">Train Custom Categories</a>
+
+    <div class="mode-grid">
+      <a href="/freedraw.html" class="mode-card">
+        <span class="mode-icon">&#x1F3A8;</span>
+        <span class="mode-label">Free Drawing</span>
+        <span class="mode-desc">Draw &amp; see AI predictions</span>
+      </a>
+      <a href="/train.html" class="mode-card">
+        <span class="mode-icon">&#x1F9E0;</span>
+        <span class="mode-label">Train AI</span>
+        <span class="mode-desc">Teach new categories</span>
+      </a>
+      <a href="/leaderboard.html" class="mode-card">
+        <span class="mode-icon">&#x1F3C6;</span>
+        <span class="mode-label">Leaderboard</span>
+        <span class="mode-desc">Full screen view</span>
+      </a>
+      <a href="/slides/" class="mode-card">
+        <span class="mode-icon">&#x1F4CA;</span>
+        <span class="mode-label">Presentation</span>
+        <span class="mode-desc">Slide deck</span>
+      </a>
+    </div>
+
+    <hr class="divider">
+
+    <div class="mini-leaderboard">
+      <h3>Leaderboard</h3>
+      <div id="mini-lb">
+        <p class="mini-leaderboard-empty">No players yet</p>
+      </div>
     </div>
   </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
@@ -32,6 +127,22 @@
     socket.on('game-config', (config) => {
       sessionStorage.setItem('gameConfig', JSON.stringify(config));
       window.location.href = '/game.html';
+    });
+
+    // Mini leaderboard
+    socket.on('leaderboard', (players) => {
+      const container = document.getElementById('mini-lb');
+      if (players.length === 0) {
+        container.innerHTML = '<p class="mini-leaderboard-empty">No players yet</p>';
+        return;
+      }
+      container.innerHTML = players.slice(0, 5).map(p =>
+        `<div class="mini-lb-row">
+          <span class="mini-lb-rank">${p.rank}.</span>
+          <span class="mini-lb-name">${p.name}</span>
+          <span class="mini-lb-score">${p.score}</span>
+        </div>`
+      ).join('');
     });
   </script>
 </body>
