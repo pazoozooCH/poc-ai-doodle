@@ -14,8 +14,15 @@ try {
   gitCommit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
 } catch (e) { /* not a git repo */ }
 
+function getNetworkUrl() {
+  const nets = require('os').networkInterfaces();
+  const localIp = Object.values(nets).flat()
+    .find(n => n.family === 'IPv4' && !n.internal)?.address || 'localhost';
+  return `http://${localIp}:${process.env.PORT || 3000}`;
+}
+
 app.get('/api/info', (req, res) => {
-  res.json({ gitCommit, startupTime });
+  res.json({ gitCommit, startupTime, url: getNetworkUrl() });
 });
 
 app.use(express.static('public'));

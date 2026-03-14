@@ -97,6 +97,45 @@
       border-radius: 8px;
     }
     .si-game-over h2 { color: #e94560; font-size: 3rem; }
+
+    /* QR Code overlay */
+    .qr-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      padding: 8px 16px;
+      border: 2px solid #333;
+      border-radius: 20px;
+      background: rgba(22, 33, 62, 0.9);
+      color: #888;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: border-color 0.2s;
+    }
+    .qr-toggle:hover { border-color: #e94560; color: #eee; }
+    .qr-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 99;
+      cursor: pointer;
+    }
+    .qr-overlay .qr-url {
+      color: #eee;
+      font-size: 1.5rem;
+      margin-top: 20px;
+      font-family: monospace;
+    }
+    .qr-overlay .qr-hint {
+      color: #888;
+      font-size: 0.9rem;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -154,11 +193,39 @@
     </div>
   </div>
 
+  <button class="qr-toggle" id="qr-toggle">QR Code</button>
+  <div class="qr-overlay" id="qr-overlay" style="display:none">
+    <div id="qr-code"></div>
+    <div class="qr-url" id="qr-url"></div>
+    <div class="qr-hint">Scan to join &middot; click anywhere to close</div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <script src="/js/leaderboard.js"></script>
   <script type="module">
     import { initFooter } from '/js/shared/footer.js';
     initFooter();
+  </script>
+  <script>
+    (async () => {
+      const resp = await fetch('/api/info');
+      const info = await resp.json();
+      const url = info.url;
+
+      const qr = qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 4 });
+      document.getElementById('qr-code').querySelector('svg').style.borderRadius = '8px';
+      document.getElementById('qr-url').textContent = url;
+
+      const overlay = document.getElementById('qr-overlay');
+      document.getElementById('qr-toggle').addEventListener('click', () => {
+        overlay.style.display = overlay.style.display === 'none' ? 'flex' : 'none';
+      });
+      overlay.addEventListener('click', () => { overlay.style.display = 'none'; });
+    })();
   </script>
 </body>
 </html>
