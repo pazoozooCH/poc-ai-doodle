@@ -38,9 +38,12 @@ socket.on('full-state', ({ gameMode, gameState, players, leaderboard }) => {
   });
 
   // Show/hide containers
-  lobbyContainer.style.display = gameState === 'lobby' ? '' : 'none';
-  qdContainer.style.display = gameState === 'playing' && gameMode === 'quick-draw' ? '' : 'none';
-  siContainer.style.display = gameState === 'playing' && gameMode === 'space-invaders' ? '' : 'none';
+  const isLobby = gameState === 'lobby';
+  const isPlaying = gameState === 'playing';
+  lobbyContainer.style.display = isLobby ? '' : 'none';
+  qdContainer.style.display = isPlaying && gameMode === 'quick-draw' ? '' : 'none';
+  // SI container: show during lobby (for config) AND during play
+  siContainer.style.display = gameMode === 'space-invaders' ? '' : 'none';
 
   // Start/stop buttons
   startBtn.style.display = gameState === 'lobby' ? '' : 'none';
@@ -217,9 +220,9 @@ document.getElementById('si-difficulty').addEventListener('change', (e) => {
 
 document.getElementById('si-speed').addEventListener('change', (e) => {
   const speeds = {
-    slow: { spawnInterval: 5000, moveInterval: 800 },
-    medium: { spawnInterval: 3000, moveInterval: 500 },
-    fast: { spawnInterval: 1500, moveInterval: 300 },
+    slow: { spawnInterval: 6000, moveInterval: 3000 },
+    medium: { spawnInterval: 4000, moveInterval: 2000 },
+    fast: { spawnInterval: 2000, moveInterval: 1000 },
   };
   socket.emit('si-config', speeds[e.target.value]);
 });

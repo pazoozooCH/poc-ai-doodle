@@ -106,11 +106,11 @@ function startQuickDraw() {
 
 const SI_CONFIG = {
   difficulty: 0.5,
-  spawnInterval: 3000,
-  moveInterval: 500,
+  spawnInterval: 4000,
+  moveInterval: 2000,
   invaderSpeed: 1,
-  gridRows: 12,
-  gridCols: 8,
+  gridRows: 10,
+  gridCols: 6,
   hitBonus: 100,
   missPenalty: -30,
 };

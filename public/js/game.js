@@ -197,7 +197,6 @@ socket.on('si-state', (state) => {
     initSI();
     showView('siGame');
     currentView = 'siGame';
-    document.getElementById('si-waiting').style.display = 'none';
 
     // Start classifying
     if (!siClassifyInterval) {
@@ -208,13 +207,12 @@ socket.on('si-state', (state) => {
   if (!state.running && currentView === 'siGame') {
     clearInterval(siClassifyInterval);
     siClassifyInterval = null;
+    showView('lobby');
+    currentView = 'lobby';
     if (state.gameOver) {
-      document.getElementById('si-waiting').style.display = '';
-      document.getElementById('si-waiting').textContent = 'Game Over! Waiting for host...';
+      showSiFeedback('Game Over!', 'miss');
     }
   }
-
-  updateTargetList();
 });
 
 socket.on('si-hit', ({ playerName: pn, category }) => {
@@ -244,33 +242,20 @@ async function siClassifyAndShoot() {
   const { tensor } = preprocessCanvas(siDrawer.canvas);
   const results = await classify(tensor);
 
-  // Show predictions
+  // Show top predictions
   const container = document.getElementById('si-predictions');
   if (container) {
     container.innerHTML = results.slice(0, 3).map(r => {
       const pct = (r.prob * 100).toFixed(0);
-      const onScreen = siInvaders.some(inv => inv.category === r.label);
-      return `<span class="prediction-tag ${onScreen ? 'match' : ''}">${r.label} ${pct}%</span>`;
+      return `<span class="prediction-tag">${r.label} ${pct}%</span>`;
     }).join('');
   }
 
-  // Auto-shoot if top prediction matches an on-screen invader
-  if (results.length > 0 && results[0].prob > 0.4) {
-    const topLabel = results[0].label;
-    if (siInvaders.some(inv => inv.category === topLabel)) {
-      socket.emit('si-shoot', { category: topLabel, confidence: results[0].prob });
-      siDrawer.clear();
-    }
+  // Auto-shoot: send top prediction to server, server checks if it matches
+  if (results.length > 0 && results[0].prob > 0.3) {
+    socket.emit('si-shoot', { category: results[0].label, confidence: results[0].prob });
+    siDrawer.clear();
   }
-}
-
-function updateTargetList() {
-  const container = document.getElementById('si-targets');
-  if (!container) return;
-  const categories = [...new Set(siInvaders.map(inv => inv.category))];
-  container.innerHTML = categories.length > 0
-    ? categories.map(c => `<span class="si-invader-tag">${c}</span>`).join('')
-    : '<span style="color:#555">No invaders yet</span>';
 }
 
 let siFeedbackTimeout = null;
