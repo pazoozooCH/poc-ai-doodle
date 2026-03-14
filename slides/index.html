@@ -61,24 +61,24 @@
     .reveal .progress { color: var(--inftec-orange); }
     .reveal .controls { color: var(--inftec-orange); }
 
-    /* iframe slides: heading bar + iframe below */
-    .iframe-slide {
-      height: 100%;
+    /* iframe slides need full height */
+    .reveal .slides section .iframe-slide {
+      height: 700px;
+      width: 100%;
       display: flex;
       flex-direction: column;
-      align-items: stretch;
     }
     .iframe-slide h3 {
       margin: 0;
-      padding: 15px 20px 10px;
+      padding: 10px 0;
       text-align: center;
       flex-shrink: 0;
     }
     .iframe-slide iframe {
       flex: 1;
+      width: 100%;
       border: none;
       border-radius: 8px;
-      margin: 0 20px 20px;
     }
 
     /* Click shield to capture clicks and refocus for keyboard nav */
