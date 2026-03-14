@@ -1,9 +1,6 @@
-const LABELS = [
-  'airplane', 'apple', 'banana', 'bicycle', 'bird', 'sailboat', 'car', 'cat',
-  'clock', 'dog', 'fish', 'flower', 'guitar', 'hat', 'skull', 'house',
-  'lightning', 'moon', 'pizza', 'shoe', 'smiley face', 'star', 'sun',
-  'tree', 'umbrella'
-];
+import { initCanvas } from './shared/canvas.js';
+import { preprocessCanvas } from './shared/preprocessing.js';
+import { loadModels, classify, syncCustomCategories } from './shared/model.js';
 
 const socket = io();
 const config = JSON.parse(sessionStorage.getItem('gameConfig'));
@@ -13,14 +10,8 @@ if (!config || !playerName) {
   window.location.href = '/';
 }
 
-// Reconnect with name
 socket.emit('join', playerName);
-
-let model = null;
-let featureModel = null;
-let customCategories = {};
-socket.on('custom-categories', (cats) => { customCategories = cats; });
-socket.emit('get-custom-categories');
+syncCustomCategories(socket);
 
 let currentRound = 0;
 let score = 0;
@@ -28,175 +19,10 @@ let streak = 0;
 let timerInterval = null;
 let timeLeft = 0;
 let classifyInterval = null;
-let isDrawing = false;
-let hasStrokes = false;
 
-// Canvas setup
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-ctx.lineWidth = 16;
-ctx.lineCap = 'round';
-ctx.lineJoin = 'round';
-ctx.strokeStyle = '#000';
-
-// Drawing
-let lastX = 0, lastY = 0;
-
-function getPos(e) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  if (e.touches) {
-    return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
-  }
-  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
-}
-
-function startDraw(e) {
-  e.preventDefault();
-  isDrawing = true;
-  const pos = getPos(e);
-  lastX = pos.x;
-  lastY = pos.y;
-}
-
-function draw(e) {
-  e.preventDefault();
-  if (!isDrawing) return;
-  hasStrokes = true;
-  const pos = getPos(e);
-  ctx.beginPath();
-  ctx.moveTo(lastX, lastY);
-  ctx.lineTo(pos.x, pos.y);
-  ctx.stroke();
-  lastX = pos.x;
-  lastY = pos.y;
-}
-
-function endDraw(e) {
-  e.preventDefault();
-  isDrawing = false;
-}
-
-canvas.addEventListener('mousedown', startDraw);
-canvas.addEventListener('mousemove', draw);
-canvas.addEventListener('mouseup', endDraw);
-canvas.addEventListener('mouseleave', endDraw);
-canvas.addEventListener('touchstart', startDraw, { passive: false });
-canvas.addEventListener('touchmove', draw, { passive: false });
-canvas.addEventListener('touchend', endDraw, { passive: false });
-
-document.getElementById('btn-clear').addEventListener('click', clearCanvas);
-
-function clearCanvas() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  hasStrokes = false;
-  document.getElementById('predictions').innerHTML = '';
-}
-
-// Model inference
-function preprocessCanvas() {
-  // Find bounding box of the drawing to center it (like the training data)
-  const srcData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      const i = (y * canvas.width + x) * 4;
-      if (srcData[i + 3] > 0 && (srcData[i] < 200 || srcData[i+1] < 200 || srcData[i+2] < 200)) {
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      }
-    }
-  }
-
-  const tmpCanvas = document.createElement('canvas');
-  tmpCanvas.width = 28;
-  tmpCanvas.height = 28;
-  const tmpCtx = tmpCanvas.getContext('2d');
-  tmpCtx.fillStyle = 'white';
-  tmpCtx.fillRect(0, 0, 28, 28);
-
-  if (maxX > minX && maxY > minY) {
-    // Add padding and maintain aspect ratio, centered in 28x28
-    const padding = 2;
-    const drawW = maxX - minX;
-    const drawH = maxY - minY;
-    const scale = (28 - padding * 2) / Math.max(drawW, drawH);
-    const w = drawW * scale;
-    const h = drawH * scale;
-    const offX = (28 - w) / 2;
-    const offY = (28 - h) / 2;
-    tmpCtx.drawImage(canvas, minX, minY, drawW, drawH, offX, offY, w, h);
-  }
-
-  const imageData = tmpCtx.getImageData(0, 0, 28, 28);
-  const data = imageData.data;
-  const input = new Float32Array(28 * 28);
-
-  for (let i = 0; i < 28 * 28; i++) {
-    const r = data[i * 4];
-    const g = data[i * 4 + 1];
-    const b = data[i * 4 + 2];
-    const gray = (r + g + b) / 3;
-    input[i] = 1.0 - gray / 255.0;
-  }
-
-  // Update debug preview
-  const debugEl = document.getElementById('debug-preview');
-  if (debugEl) {
-    tmpCtx.putImageData(imageData, 0, 0);
-    debugEl.style.display = '';
-    debugEl.src = tmpCanvas.toDataURL();
-  }
-
-  return new ort.Tensor('float32', input, [1, 1, 28, 28]);
-}
-
-function softmax(arr) {
-  const max = Math.max(...arr);
-  const exps = arr.map(x => Math.exp(x - max));
-  const sum = exps.reduce((a, b) => a + b);
-  return exps.map(x => x / sum);
-}
-
-function cosineSimilarity(a, b) {
-  let dot = 0, normA = 0, normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB) + 1e-8);
-}
-
-async function classify() {
-  if (!model || !hasStrokes) return [];
-
-  const tensor = preprocessCanvas();
-  const output = await model.run({ input: tensor });
-  const logits = Array.from(output.output.data);
-  const probs = softmax(logits);
-
-  let results = LABELS.map((label, i) => ({ label, prob: probs[i] }));
-
-  // Merge custom categories
-  if (featureModel && Object.keys(customCategories).length > 0) {
-    const featOutput = await featureModel.run({ input: tensor });
-    const features = Array.from(featOutput.features.data);
-    for (const [name, data] of Object.entries(customCategories)) {
-      if (!data.samples || data.samples.length === 0) continue;
-      const avgSim = data.samples.reduce((sum, s) => sum + cosineSimilarity(features, s), 0) / data.samples.length;
-      // Sigmoid mapping centered around 0.82
-      const score = 1 / (1 + Math.exp(-20 * (avgSim - 0.82)));
-      results.push({ label: name + ' *', prob: score });
-    }
-  }
-
-  results.sort((a, b) => b.prob - a.prob);
-  return results;
-}
+const drawer = initCanvas(document.getElementById('canvas'), {
+  clearButton: document.getElementById('btn-clear')
+});
 
 function showPredictions(results, targetWord) {
   const container = document.getElementById('predictions');
@@ -209,23 +35,25 @@ function showPredictions(results, targetWord) {
   });
   if (!targetInTop5) {
     const target = results.find(r => r.label === targetWord);
-    const pct = (target.prob * 100).toFixed(0);
-    tags.push(`<span class="prediction-tag match" style="opacity:0.6">${target.label} ${pct}%</span>`);
+    if (target) {
+      const pct = (target.prob * 100).toFixed(0);
+      tags.push(`<span class="prediction-tag match" style="opacity:0.6">${target.label} ${pct}%</span>`);
+    }
   }
   container.innerHTML = tags.join('');
 }
 
-// Game flow
-async function loadModel() {
+async function runClassify() {
+  if (!drawer.state.hasStrokes) return [];
+  const { tensor } = preprocessCanvas(drawer.canvas, {
+    debugElement: document.getElementById('debug-preview')
+  });
+  return await classify(tensor);
+}
+
+async function init() {
   try {
-    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
-    const [modelResp, featResp] = await Promise.all([
-      fetch('/model/model.onnx'),
-      fetch('/model/feature_extractor.onnx')
-    ]);
-    const [modelBuf, featBuf] = await Promise.all([modelResp.arrayBuffer(), featResp.arrayBuffer()]);
-    model = await ort.InferenceSession.create(new Uint8Array(modelBuf));
-    featureModel = await ort.InferenceSession.create(new Uint8Array(featBuf));
+    await loadModels({ main: true, features: true });
     document.getElementById('loading').style.display = 'none';
     document.getElementById('game').style.display = 'block';
     startRound();
@@ -243,12 +71,12 @@ function startRound() {
     return;
   }
 
-  clearCanvas();
+  drawer.clear();
   const word = config.words[currentRound];
   document.getElementById('prompt-word').textContent = word;
   document.getElementById('round-info').textContent = `${currentRound + 1} / ${config.numRounds}`;
   document.getElementById('score').textContent = `Score: ${score}`;
-  document.getElementById('streak').textContent = streak >= 2 ? '🔥'.repeat(Math.min(streak, 5)) : '';
+  document.getElementById('streak').textContent = streak >= 2 ? '\u{1F525}'.repeat(Math.min(streak, 5)) : '';
 
   timeLeft = config.timeLimit;
   updateTimer();
@@ -262,7 +90,7 @@ function startRound() {
   }, 100);
 
   classifyInterval = setInterval(async () => {
-    const results = await classify();
+    const results = await runClassify();
     if (results.length > 0) {
       showPredictions(results, word);
       if (results[0].label === word && results[0].prob > 0.3) {
@@ -295,7 +123,6 @@ function finishRound(success) {
 
   socket.emit('round-result', { success, timeTaken: Math.round(timeTaken * 10) / 10 });
 
-  // Show overlay
   const overlay = document.getElementById('round-overlay');
   const resultText = document.getElementById('round-result-text');
   if (success) {
@@ -320,5 +147,4 @@ function endGame() {
   document.getElementById('final-score').textContent = score;
 }
 
-// Start
-loadModel();
+init();

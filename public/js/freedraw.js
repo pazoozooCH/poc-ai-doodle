@@ -1,239 +1,73 @@
-const LABELS = [
-  'airplane', 'apple', 'banana', 'bicycle', 'bird', 'sailboat', 'car', 'cat',
-  'clock', 'dog', 'fish', 'flower', 'guitar', 'hat', 'skull', 'house',
-  'lightning', 'moon', 'pizza', 'shoe', 'smiley face', 'star', 'sun',
-  'tree', 'umbrella'
-];
+import { initCanvas } from './shared/canvas.js';
+import { preprocessCanvas } from './shared/preprocessing.js';
+import { softmax } from './shared/math.js';
+import {
+  loadModels, classify, classifyRaw, getCustomScores,
+  syncCustomCategories, LABELS, getMainModel
+} from './shared/model.js';
 
-let model = null;
-let featureModel = null;
-let samplesData = null;
-let customCategories = {};
-let isDrawing = false;
-let hasStrokes = false;
+const socket = io();
+syncCustomCategories(socket);
+
 let classifyInterval = null;
 let aiDrawing = false;
 
-const socket = io();
-socket.on('custom-categories', (cats) => { customCategories = cats; });
-socket.emit('get-custom-categories');
-
-// Canvas setup
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-ctx.lineWidth = 16;
-ctx.lineCap = 'round';
-ctx.lineJoin = 'round';
-ctx.strokeStyle = '#000';
-
-// Drawing
-let lastX = 0, lastY = 0;
-
-function getPos(e) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  if (e.touches) {
-    return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
-  }
-  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
-}
-
-function startDraw(e) {
-  e.preventDefault();
-  stopAiDraw();
-  isDrawing = true;
-  const pos = getPos(e);
-  lastX = pos.x;
-  lastY = pos.y;
-}
-
-function draw(e) {
-  e.preventDefault();
-  if (!isDrawing) return;
-  hasStrokes = true;
-  const pos = getPos(e);
-  ctx.beginPath();
-  ctx.moveTo(lastX, lastY);
-  ctx.lineTo(pos.x, pos.y);
-  ctx.stroke();
-  lastX = pos.x;
-  lastY = pos.y;
-}
-
-function endDraw(e) {
-  e.preventDefault();
-  isDrawing = false;
-}
-
-canvas.addEventListener('mousedown', startDraw);
-canvas.addEventListener('mousemove', draw);
-canvas.addEventListener('mouseup', endDraw);
-canvas.addEventListener('mouseleave', endDraw);
-canvas.addEventListener('touchstart', startDraw, { passive: false });
-canvas.addEventListener('touchmove', draw, { passive: false });
-canvas.addEventListener('touchend', endDraw, { passive: false });
-
-document.getElementById('btn-clear').addEventListener('click', clearCanvas);
-
-function clearCanvas() {
-  stopAiDraw();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  hasStrokes = false;
+const drawer = initCanvas(document.getElementById('canvas'), {
+  clearButton: document.getElementById('btn-clear')
+});
+drawer.onClear = () => {
   document.getElementById('predictions').innerHTML = '';
   document.getElementById('top-prediction').textContent = 'Draw something!';
-}
+};
 
-// Model inference (same preprocessing as game.js)
-function preprocessCanvas() {
-  const srcData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      const i = (y * canvas.width + x) * 4;
-      if (srcData[i + 3] > 0 && (srcData[i] < 200 || srcData[i+1] < 200 || srcData[i+2] < 200)) {
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      }
-    }
-  }
-
-  const tmpCanvas = document.createElement('canvas');
-  tmpCanvas.width = 28;
-  tmpCanvas.height = 28;
-  const tmpCtx = tmpCanvas.getContext('2d');
-  tmpCtx.fillStyle = 'white';
-  tmpCtx.fillRect(0, 0, 28, 28);
-
-  if (maxX > minX && maxY > minY) {
-    const padding = 2;
-    const drawW = maxX - minX;
-    const drawH = maxY - minY;
-    const scale = (28 - padding * 2) / Math.max(drawW, drawH);
-    const w = drawW * scale;
-    const h = drawH * scale;
-    const offX = (28 - w) / 2;
-    const offY = (28 - h) / 2;
-    tmpCtx.drawImage(canvas, minX, minY, drawW, drawH, offX, offY, w, h);
-  }
-
-  const imageData = tmpCtx.getImageData(0, 0, 28, 28);
-  const data = imageData.data;
-  const input = new Float32Array(28 * 28);
-
-  for (let i = 0; i < 28 * 28; i++) {
-    const r = data[i * 4];
-    const g = data[i * 4 + 1];
-    const b = data[i * 4 + 2];
-    const gray = (r + g + b) / 3;
-    input[i] = 1.0 - gray / 255.0;
-  }
-
-  const debugEl = document.getElementById('debug-preview');
-  if (debugEl) {
-    tmpCtx.putImageData(imageData, 0, 0);
-    debugEl.style.display = '';
-    debugEl.src = tmpCanvas.toDataURL();
-  }
-
-  return new ort.Tensor('float32', input, [1, 1, 28, 28]);
-}
-
-function softmax(arr) {
-  const max = Math.max(...arr);
-  const exps = arr.map(x => Math.exp(x - max));
-  const sum = exps.reduce((a, b) => a + b);
-  return exps.map(x => x / sum);
-}
-
-function cosineSimilarity(a, b) {
-  let dot = 0, normA = 0, normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB) + 1e-8);
-}
-
-async function getCustomScores(tensor) {
-  if (!featureModel || Object.keys(customCategories).length === 0) return { merged: [], details: [] };
-  const featOutput = await featureModel.run({ input: tensor });
-  const features = Array.from(featOutput.features.data);
-
-  const merged = [];
-  const details = [];
-  for (const [name, data] of Object.entries(customCategories)) {
-    if (!data.samples || data.samples.length === 0) continue;
-    const sims = data.samples.map(s => cosineSimilarity(features, s));
-    const avgSim = sims.reduce((a, b) => a + b, 0) / sims.length;
-    const maxSim = Math.max(...sims);
-    // Sigmoid mapping centered around 0.82 — gives gradual ramp-up
-    // instead of sudden 0% -> 50% jump with linear mapping
-    const score = 1 / (1 + Math.exp(-20 * (maxSim - 0.82)));
-    merged.push({ label: name + ' *', prob: score });
-    details.push({ name, avgSim, maxSim, score, numSamples: data.samples.length });
-  }
-  return { merged, details };
-}
-
-async function classifyRaw(inputArray) {
-  const tensor = new ort.Tensor('float32', inputArray, [1, 1, 28, 28]);
-  const output = await model.run({ input: tensor });
-  const logits = Array.from(output.output.data);
-  return softmax(logits);
-}
-
-async function classify() {
-  if (!model || !hasStrokes) return;
-
-  const tensor = preprocessCanvas();
-  const output = await model.run({ input: tensor });
-  const logits = Array.from(output.output.data);
-  const probs = softmax(logits);
-
-  let results = LABELS.map((label, i) => ({ label, prob: probs[i] }));
-
-  // Merge custom categories
-  const { merged: customScores, details: customDetails } = await getCustomScores(tensor);
-  const allResults = results.concat(customScores);
-
-  allResults.sort((a, b) => b.prob - a.prob);
-
+// --- Prediction display ---
+function renderPredictions(results) {
   document.getElementById('top-prediction').textContent =
-    `${allResults[0].label} (${(allResults[0].prob * 100).toFixed(0)}%)`;
+    `${results[0].label} (${(results[0].prob * 100).toFixed(0)}%)`;
 
   const container = document.getElementById('predictions');
-  container.innerHTML = allResults.slice(0, 5).map(r => {
+  container.innerHTML = results.slice(0, 5).map(r => {
     const pct = (r.prob * 100).toFixed(0);
     const hue = Math.round(r.prob * 120);
     const bg = `hsl(${hue}, 70%, 30%)`;
     const color = `hsl(${hue}, 80%, 80%)`;
     return `<span class="prediction-tag" style="background:${bg};color:${color}">${r.label} ${pct}%</span>`;
   }).join('');
+}
+
+function renderCustomPredictions(details) {
+  const customContainer = document.getElementById('custom-predictions');
+  if (!customContainer) return;
+  if (details.length === 0) { customContainer.innerHTML = ''; return; }
+  customContainer.innerHTML = details
+    .sort((a, b) => b.similarity - a.similarity)
+    .map(d => {
+      const pct = (d.prob * 100).toFixed(0);
+      const hue = Math.round(d.prob * 120);
+      const bg = `hsl(${hue}, 70%, 30%)`;
+      const color = `hsl(${hue}, 80%, 80%)`;
+      return `<span class="prediction-tag" style="background:${bg};color:${color}">${d.label.replace(' *', '')} ${pct}% <span style="font-size:0.7rem;opacity:0.6">(sim: ${d.similarity.toFixed(3)})</span></span>`;
+    }).join('');
+}
+
+async function runClassify() {
+  if (!drawer.state.hasStrokes) return;
+
+  const { tensor } = preprocessCanvas(drawer.canvas, {
+    debugElement: document.getElementById('debug-preview')
+  });
+
+  const results = await classify(tensor);
+  renderPredictions(results);
 
   // Separate custom categories section
-  const customContainer = document.getElementById('custom-predictions');
-  if (customContainer) {
-    if (customDetails.length === 0) {
-      customContainer.innerHTML = '';
-    } else {
-      customContainer.innerHTML = customDetails
-        .sort((a, b) => b.maxSim - a.maxSim)
-        .map(d => {
-          const pct = (d.score * 100).toFixed(0);
-          const hue = Math.round(d.score * 120);
-          const bg = `hsl(${hue}, 70%, 30%)`;
-          const color = `hsl(${hue}, 80%, 80%)`;
-          return `<span class="prediction-tag" style="background:${bg};color:${color}">${d.name} ${pct}% <span style="font-size:0.7rem;opacity:0.6">(sim: ${d.maxSim.toFixed(3)})</span></span>`;
-        }).join('');
-    }
-  }
+  const customResults = results.filter(r => r.similarity !== undefined);
+  renderCustomPredictions(customResults);
 }
 
 // --- Show Examples ---
+let samplesData = null;
+
 async function loadSamples() {
   const resp = await fetch('/model/samples.json');
   samplesData = await resp.json();
@@ -250,30 +84,26 @@ function showExamples() {
     `<img src="data:image/png;base64,${b64}" width="56" height="56" style="border:1px solid #333;border-radius:4px;image-rendering:pixelated;cursor:pointer" class="sample-img">`
   ).join('');
 
-  // Click a sample to load it onto the canvas
   grid.querySelectorAll('.sample-img').forEach(img => {
     img.addEventListener('click', () => {
       const tmpImg = new Image();
       tmpImg.onload = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(tmpImg, 0, 0, canvas.width, canvas.height);
-        hasStrokes = true;
+        drawer.ctx.clearRect(0, 0, drawer.canvas.width, drawer.canvas.height);
+        drawer.ctx.drawImage(tmpImg, 0, 0, drawer.canvas.width, drawer.canvas.height);
+        drawer.state.hasStrokes = true;
       };
       tmpImg.src = img.src;
     });
   });
 }
 
-// --- AI Draw (iterative optimization) ---
-// Works on a 28x28 pixel grid directly, renders scaled up to canvas.
-// Each step: try adding a random short stroke, keep if target prob increases.
-
+// --- AI Draw ---
 function stopAiDraw() {
   aiDrawing = false;
   document.getElementById('btn-ai-draw').textContent = 'Watch AI Draw';
   document.getElementById('ai-status').textContent = '';
   if (!classifyInterval) {
-    classifyInterval = setInterval(classify, 300);
+    classifyInterval = setInterval(runClassify, 300);
   }
 }
 
@@ -302,19 +132,18 @@ function pixelsToImageData(pixels, size) {
 }
 
 function renderPixelsToCanvas(pixels) {
-  const tmpCanvas = pixelsToImageData(pixels, canvas.width);
-  ctx.drawImage(tmpCanvas, 0, 0);
+  const tmpCanvas = pixelsToImageData(pixels, drawer.canvas.width);
+  drawer.ctx.drawImage(tmpCanvas, 0, 0);
 }
 
 function pixelsToDataURL(pixels) {
   return pixelsToImageData(pixels, 56).toDataURL();
 }
 
-// Best snapshots gallery
-const topSnapshots = []; // { prob, dataURL }
+const topSnapshots = [];
 const MAX_SNAPSHOTS = 5;
 
-function updateGallery(pixels, prob, cat) {
+function updateGallery(pixels, prob) {
   const dominated = topSnapshots.length >= MAX_SNAPSHOTS && prob <= topSnapshots[topSnapshots.length - 1].prob;
   if (dominated) return;
 
@@ -336,7 +165,6 @@ function updateGallery(pixels, prob, cat) {
   }).join('');
 }
 
-// Draw a line on 28x28 pixel grid with given brush size
 function drawLine(pixels, sx, sy, len, angle, val, brush) {
   const result = new Float32Array(pixels);
   for (let i = 0; i <= len; i++) {
@@ -355,18 +183,15 @@ function drawLine(pixels, sx, sy, len, angle, val, brush) {
 }
 
 function mutatePixels(pixels, intensity) {
-  // intensity 0-1 controls how bold the mutations are
-  // Higher early on, lower as we refine
   const result = new Float32Array(pixels);
-  const numMutations = Math.ceil(1 + intensity * 3); // 1-4 mutations at once
+  const numMutations = Math.ceil(1 + intensity * 3);
 
   for (let m = 0; m < numMutations; m++) {
     const action = Math.random();
-    const maxLen = Math.floor(2 + intensity * 10); // 2-12px strokes
-    const brush = Math.random() < intensity ? 1 : 0; // thicker brush when intense
+    const maxLen = Math.floor(2 + intensity * 10);
+    const brush = Math.random() < intensity ? 1 : 0;
 
     if (action < 0.35) {
-      // Draw stroke
       const sx = Math.floor(Math.random() * 28);
       const sy = Math.floor(Math.random() * 28);
       const len = Math.floor(Math.random() * maxLen) + 1;
@@ -374,7 +199,6 @@ function mutatePixels(pixels, intensity) {
       const drawn = drawLine(result, sx, sy, len, angle, 1, brush);
       for (let i = 0; i < 784; i++) result[i] = drawn[i];
     } else if (action < 0.6) {
-      // Erase stroke
       const sx = Math.floor(Math.random() * 28);
       const sy = Math.floor(Math.random() * 28);
       const len = Math.floor(Math.random() * maxLen) + 1;
@@ -382,7 +206,6 @@ function mutatePixels(pixels, intensity) {
       const erased = drawLine(result, sx, sy, len, angle, 0, brush);
       for (let i = 0; i < 784; i++) result[i] = erased[i];
     } else if (action < 0.75) {
-      // Flip a random rectangular patch
       const w = Math.floor(Math.random() * (3 + intensity * 5)) + 1;
       const h = Math.floor(Math.random() * (3 + intensity * 5)) + 1;
       const ox = Math.floor(Math.random() * (28 - w));
@@ -393,7 +216,6 @@ function mutatePixels(pixels, intensity) {
         }
       }
     } else if (action < 0.9) {
-      // Shift entire image by 1-2px in a random direction
       const dx = Math.floor(Math.random() * 3) - 1;
       const dy = Math.floor(Math.random() * 3) - 1;
       const copy = new Float32Array(784);
@@ -407,7 +229,6 @@ function mutatePixels(pixels, intensity) {
       }
       for (let i = 0; i < 784; i++) result[i] = copy[i];
     } else {
-      // Scatter: randomly toggle several pixels
       const count = Math.floor(5 + intensity * 20);
       for (let i = 0; i < count; i++) {
         const idx = Math.floor(Math.random() * 784);
@@ -418,39 +239,21 @@ function mutatePixels(pixels, intensity) {
   return result;
 }
 
-function updatePredictions(probs) {
-  const results = LABELS.map((label, i) => ({ label, prob: probs[i] }))
-    .sort((a, b) => b.prob - a.prob);
-  document.getElementById('top-prediction').textContent =
-    `${results[0].label} (${(results[0].prob * 100).toFixed(0)}%)`;
-  const container = document.getElementById('predictions');
-  container.innerHTML = results.slice(0, 5).map(r => {
-    const pct = (r.prob * 100).toFixed(0);
-    const hue = Math.round(r.prob * 120);
-    const bg = `hsl(${hue}, 70%, 30%)`;
-    const color = `hsl(${hue}, 80%, 80%)`;
-    return `<span class="prediction-tag" style="background:${bg};color:${color}">${r.label} ${pct}%</span>`;
-  }).join('');
-}
-
 async function aiDraw() {
   const cat = document.getElementById('category-select').value;
   const targetIdx = LABELS.indexOf(cat);
   const statusEl = document.getElementById('ai-status');
   const btn = document.getElementById('btn-ai-draw');
 
-  if (aiDrawing) {
-    stopAiDraw();
-    return;
-  }
+  if (aiDrawing) { stopAiDraw(); return; }
 
   aiDrawing = true;
   btn.textContent = 'Stop';
   clearInterval(classifyInterval);
   classifyInterval = null;
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  hasStrokes = true;
+  drawer.ctx.clearRect(0, 0, drawer.canvas.width, drawer.canvas.height);
+  drawer.state.hasStrokes = true;
   topSnapshots.length = 0;
   document.getElementById('ai-gallery').innerHTML = '';
 
@@ -461,20 +264,16 @@ async function aiDraw() {
   let iteration = 0;
   let accepted = 0;
   let stuckCount = 0;
-
-  // Simulated annealing: start hot (accept bad moves), cool down
   const MAX_ITER = 5000;
 
   while (aiDrawing && iteration < MAX_ITER) {
     const temperature = Math.max(0.01, 1 - iteration / MAX_ITER);
-    // intensity controls mutation size: bold early, fine later
     const intensity = Math.max(0.1, temperature);
 
     const candidate = mutatePixels(pixels, intensity);
     const probs = await classifyRaw(candidate);
     const candidateProb = probs[targetIdx];
 
-    // Accept if better, or probabilistically if worse (simulated annealing)
     const delta = candidateProb - currentProb;
     const acceptWorse = Math.random() < Math.exp(delta * 10 / temperature);
 
@@ -487,20 +286,19 @@ async function aiDraw() {
         globalBestPixels = new Float32Array(pixels);
         globalBestProb = currentProb;
         stuckCount = 0;
-        updateGallery(pixels, globalBestProb, cat);
+        updateGallery(pixels, globalBestProb);
       }
 
       renderPixelsToCanvas(pixels);
-      updatePredictions(probs);
+      const results = LABELS.map((label, i) => ({ label, prob: probs[i] })).sort((a, b) => b.prob - a.prob);
+      renderPredictions(results);
     }
 
     stuckCount++;
 
-    // If stuck for too long, restart from global best with a shake-up
     if (stuckCount > 200) {
       pixels = new Float32Array(globalBestPixels);
       currentProb = globalBestProb;
-      // Apply a big random mutation to escape
       pixels = mutatePixels(pixels, 0.8);
       const resetProbs = await classifyRaw(pixels);
       currentProb = resetProbs[targetIdx];
@@ -510,44 +308,37 @@ async function aiDraw() {
     iteration++;
     if (iteration % 5 === 0) {
       statusEl.textContent = `Iteration ${iteration}/${MAX_ITER} — ${cat}: ${(globalBestProb * 100).toFixed(1)}% (temp: ${temperature.toFixed(2)})`;
-      // Yield to browser every 5 iterations
       await new Promise(r => setTimeout(r, 0));
     }
 
     if (globalBestProb > 0.95) {
-      // Show the global best on canvas
       renderPixelsToCanvas(globalBestPixels);
       const finalProbs = await classifyRaw(globalBestPixels);
-      updatePredictions(finalProbs);
+      const results = LABELS.map((label, i) => ({ label, prob: finalProbs[i] })).sort((a, b) => b.prob - a.prob);
+      renderPredictions(results);
       statusEl.textContent = `Done! ${cat}: ${(globalBestProb * 100).toFixed(1)}% after ${iteration} iterations`;
       break;
     }
   }
 
-  // Make sure we end showing the best result
   if (globalBestProb > currentProb) {
     renderPixelsToCanvas(globalBestPixels);
     const finalProbs = await classifyRaw(globalBestPixels);
-    updatePredictions(finalProbs);
+    const results = LABELS.map((label, i) => ({ label, prob: finalProbs[i] })).sort((a, b) => b.prob - a.prob);
+    renderPredictions(results);
   }
 
   aiDrawing = false;
   btn.textContent = 'Watch AI Draw';
 }
 
-// --- Init ---
-async function loadModel() {
-  try {
-    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
-    const [modelResp, featResp] = await Promise.all([
-      fetch('/model/model.onnx'),
-      fetch('/model/feature_extractor.onnx')
-    ]);
-    const [modelBuf, featBuf] = await Promise.all([modelResp.arrayBuffer(), featResp.arrayBuffer()]);
-    model = await ort.InferenceSession.create(new Uint8Array(modelBuf));
-    featureModel = await ort.InferenceSession.create(new Uint8Array(featBuf));
+drawer.onDrawStart = () => { if (aiDrawing) stopAiDraw(); };
 
-    // Populate category selector
+// --- Init ---
+async function init() {
+  try {
+    await loadModels({ main: true, features: true });
+
     const select = document.getElementById('category-select');
     LABELS.forEach(l => {
       const opt = document.createElement('option');
@@ -563,7 +354,7 @@ async function loadModel() {
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    classifyInterval = setInterval(classify, 300);
+    classifyInterval = setInterval(runClassify, 300);
   } catch (err) {
     document.getElementById('loading').innerHTML =
       `<p style="color:#e94560">Failed to load model.</p>`;
@@ -571,4 +362,4 @@ async function loadModel() {
   }
 }
 
-loadModel();
+init();
