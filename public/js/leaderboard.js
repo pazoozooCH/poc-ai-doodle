@@ -29,7 +29,6 @@ stopBtn.addEventListener('click', () => {
 
 // ============ Full state updates ============
 socket.on('full-state', ({ gameMode, gameState, players, leaderboard }) => {
-  console.log('full-state:', gameMode, gameState, 'players:', players.length);
   currentMode = gameMode;
   currentState = gameState;
 
@@ -41,10 +40,12 @@ socket.on('full-state', ({ gameMode, gameState, players, leaderboard }) => {
   // Show/hide containers
   const isLobby = gameState === 'lobby';
   const isPlaying = gameState === 'playing';
-  lobbyContainer.style.display = isLobby ? '' : 'none';
-  qdContainer.style.display = isPlaying && gameMode === 'quick-draw' ? '' : 'none';
-  // SI container: show during lobby (for config) AND during play
-  siContainer.style.display = gameMode === 'space-invaders' ? '' : 'none';
+  const isSI = gameMode === 'space-invaders';
+  // Lobby: show for quick-draw lobby only (SI has its own layout)
+  lobbyContainer.style.display = isLobby && !isSI ? '' : 'none';
+  qdContainer.style.display = isPlaying && !isSI ? '' : 'none';
+  // SI container: show whenever SI mode is selected
+  siContainer.style.display = isSI ? '' : 'none';
 
   // Start/stop buttons
   startBtn.style.display = gameState === 'lobby' ? '' : 'none';
@@ -92,15 +93,19 @@ function updateLeaderboard(players) {
       </table>`;
   }
 
-  // SI sidebar scores
+  // SI sidebar scores/players
   const siScores = document.getElementById('si-scores');
   if (siScores) {
-    siScores.innerHTML = players.slice(0, 10).map(p =>
-      `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1a1a2e;font-size:0.85rem">
-        <span>${p.name}</span>
-        <span style="color:#e94560;font-weight:600">${p.score}</span>
-      </div>`
-    ).join('') || '<p style="color:#555;font-size:0.85rem">No scores</p>';
+    if (players.length === 0) {
+      siScores.innerHTML = '<p style="color:#555;font-size:0.85rem">Waiting for players...</p>';
+    } else {
+      siScores.innerHTML = players.slice(0, 10).map(p =>
+        `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1a1a2e;font-size:0.85rem">
+          <span>${p.name}</span>
+          <span style="color:#e94560;font-weight:600">${p.score}</span>
+        </div>`
+      ).join('');
+    }
   }
 }
 
@@ -108,7 +113,6 @@ function updateLeaderboard(players) {
 const siCanvas = document.getElementById('si-canvas');
 const siCtx = siCanvas ? siCanvas.getContext('2d') : null;
 let siState = { invaders: [], gameOver: false, running: false, gridRows: 10, gridCols: 6 };
-console.log('SI canvas found:', !!siCanvas);
 
 let sampleImages = {};
 fetch('/model/samples.json')
