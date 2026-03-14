@@ -1,6 +1,8 @@
 import { initCanvas } from './shared/canvas.js';
 import { preprocessCanvas } from './shared/preprocessing.js';
 import { softmax } from './shared/math.js';
+import { initFooter } from './shared/footer.js';
+initFooter();
 import {
   loadModels, classify, classifyRaw, getCustomScores,
   syncCustomCategories, LABELS, getMainModel

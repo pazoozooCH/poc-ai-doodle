@@ -1,6 +1,8 @@
 import { initCanvas } from './shared/canvas.js';
 import { preprocessCanvas } from './shared/preprocessing.js';
 import { loadModels, extractFeatures } from './shared/model.js';
+import { initFooter } from './shared/footer.js';
+initFooter();
 
 const socket = io();
 let currentCategory = null;

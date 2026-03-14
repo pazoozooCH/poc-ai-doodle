@@ -2,9 +2,22 @@ const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 
+const { execSync } = require('child_process');
+
 const app = express();
 const http = createServer(app);
 const io = new Server(http);
+
+// Server info endpoint
+const startupTime = new Date().toISOString();
+let gitCommit = 'unknown';
+try {
+  gitCommit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+} catch (e) { /* not a git repo */ }
+
+app.get('/api/info', (req, res) => {
+  res.json({ gitCommit, startupTime });
+});
 
 app.use(express.static('public'));
 app.use('/slides', express.static('slides'));
