@@ -215,7 +215,18 @@ socket.on('si-state', (state) => {
 socket.on('si-hit', ({ playerName, category }) => {
   const feed = document.getElementById('si-feed');
   const entry = document.createElement('div');
-  entry.textContent = `${playerName} shot ${category}!`;
+  entry.style.color = '#2ecc71';
+  entry.textContent = `\u2714 ${playerName} shot ${category}!`;
+  feed.prepend(entry);
+  while (feed.children.length > 20) feed.lastChild.remove();
+});
+
+socket.on('si-miss-feed', ({ playerName, category, reason }) => {
+  const feed = document.getElementById('si-feed');
+  const entry = document.createElement('div');
+  entry.style.color = '#e94560';
+  const reasonText = reason === 'not-on-screen' ? 'not on screen' : 'too low confidence';
+  entry.textContent = `\u2718 ${playerName} missed (${category} \u2014 ${reasonText})`;
   feed.prepend(entry);
   while (feed.children.length > 20) feed.lastChild.remove();
 });

@@ -32,6 +32,26 @@
     .si-feedback { text-align: center; padding: 10px; font-size: 1.1rem; font-weight: 600; min-height: 2em; }
     .si-feedback.hit { color: #2ecc71; }
     .si-feedback.miss { color: #e94560; }
+
+    /* Particle overlay */
+    #particle-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 200;
+    }
+
+    /* Hit/miss flash */
+    .flash-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 199;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    .flash-overlay.flash-hit { background: rgba(46, 204, 113, 0.3); opacity: 1; }
+    .flash-overlay.flash-miss { background: rgba(233, 69, 96, 0.3); opacity: 1; }
   </style>
 </head>
 <body>
@@ -119,6 +139,9 @@
   <div id="round-overlay" class="round-result-overlay" style="display:none">
     <div class="result-content" id="round-result-text"></div>
   </div>
+
+  <canvas id="particle-canvas"></canvas>
+  <div class="flash-overlay" id="flash-overlay"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>

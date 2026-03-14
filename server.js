@@ -300,10 +300,9 @@ io.on('connection', (socket) => {
     } else {
       player.score += SI_CONFIG.missPenalty;
       player.streak = 0;
-      socket.emit('si-miss', {
-        category,
-        reason: matchingInvaders.length === 0 ? 'not-on-screen' : 'too-low'
-      });
+      const reason = matchingInvaders.length === 0 ? 'not-on-screen' : 'too-low';
+      socket.emit('si-miss', { category, reason });
+      io.emit('si-miss-feed', { playerName: player.name, category, reason });
       broadcastFullState();
     }
   });

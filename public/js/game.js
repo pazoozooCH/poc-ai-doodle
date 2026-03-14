@@ -277,8 +277,69 @@ function showSiFeedback(msg, type) {
   el.textContent = msg;
   el.className = 'si-feedback ' + type;
   clearTimeout(siFeedbackTimeout);
-  siFeedbackTimeout = setTimeout(() => { el.textContent = ''; }, 2000);
+  siFeedbackTimeout = setTimeout(() => { el.textContent = ''; el.className = 'si-feedback'; }, 2000);
+
+  // Flash overlay
+  const flash = document.getElementById('flash-overlay');
+  if (flash) {
+    flash.className = 'flash-overlay ' + (type === 'hit' ? 'flash-hit' : 'flash-miss');
+    setTimeout(() => { flash.className = 'flash-overlay'; }, 300);
+  }
+
+  // Particles
+  spawnParticles(type === 'hit' ? '#2ecc71' : '#e94560', type === 'hit' ? 30 : 15);
 }
+
+// ============ Particles ============
+const particleCanvas = document.getElementById('particle-canvas');
+const pCtx = particleCanvas ? particleCanvas.getContext('2d') : null;
+let particles = [];
+
+function resizeParticleCanvas() {
+  if (!particleCanvas) return;
+  particleCanvas.width = window.innerWidth;
+  particleCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeParticleCanvas);
+resizeParticleCanvas();
+
+function spawnParticles(color, count) {
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 6;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2,
+      life: 1,
+      decay: 0.015 + Math.random() * 0.02,
+      size: 3 + Math.random() * 5,
+      color,
+    });
+  }
+}
+
+function updateParticles() {
+  if (!pCtx) return;
+  pCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+  particles = particles.filter(p => p.life > 0);
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15; // gravity
+    p.life -= p.decay;
+    pCtx.globalAlpha = p.life;
+    pCtx.fillStyle = p.color;
+    pCtx.beginPath();
+    pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    pCtx.fill();
+  }
+  pCtx.globalAlpha = 1;
+  requestAnimationFrame(updateParticles);
+}
+requestAnimationFrame(updateParticles);
 
 // ============ Init ============
 async function init() {
