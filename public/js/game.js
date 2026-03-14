@@ -198,9 +198,15 @@ socket.on('si-state', (state) => {
     showView('siGame');
     currentView = 'siGame';
 
-    // Start classifying
+    // Start live classification (no auto-shoot)
     if (!siClassifyInterval) {
-      siClassifyInterval = setInterval(siClassifyAndShoot, 400);
+      siClassifyInterval = setInterval(siClassifyLive, 400);
+    }
+    // Wire up shoot button
+    const shootBtn = document.getElementById('si-shoot');
+    if (shootBtn && !shootBtn._wired) {
+      shootBtn.addEventListener('click', siShoot);
+      shootBtn._wired = true;
     }
   }
 
@@ -237,12 +243,12 @@ socket.on('full-state', ({ leaderboard }) => {
   }
 });
 
-async function siClassifyAndShoot() {
-  if (!siDrawer || !siDrawer.state.hasStrokes || siInvaders.length === 0) return;
+async function siClassifyLive() {
+  if (!siDrawer || !siDrawer.state.hasStrokes) return;
   const { tensor } = preprocessCanvas(siDrawer.canvas);
   const results = await classify(tensor);
 
-  // Show top predictions
+  // Show live predictions (no auto-shoot)
   const container = document.getElementById('si-predictions');
   if (container) {
     container.innerHTML = results.slice(0, 3).map(r => {
@@ -250,11 +256,17 @@ async function siClassifyAndShoot() {
       return `<span class="prediction-tag">${r.label} ${pct}%</span>`;
     }).join('');
   }
+}
 
-  // Auto-shoot: send top prediction to server, server checks if it matches
-  if (results.length > 0 && results[0].prob > 0.3) {
+async function siShoot() {
+  if (!siDrawer || !siDrawer.state.hasStrokes) return;
+  const { tensor } = preprocessCanvas(siDrawer.canvas);
+  const results = await classify(tensor);
+
+  if (results.length > 0) {
     socket.emit('si-shoot', { category: results[0].label, confidence: results[0].prob });
     siDrawer.clear();
+    document.getElementById('si-predictions').innerHTML = '';
   }
 }
 
