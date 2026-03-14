@@ -11,7 +11,7 @@
 
 ## Slides
 
-Open `slides/index.html` in a browser (static file, no server needed). Requires the doodle server running for embedded live demos.
+Start the server (`npm run dev`) and open `http://localhost:3000/slides/`. The slides must be served via HTTP — opening the file directly won't work due to CORS.
 
 ### Navigation
 
