@@ -33,17 +33,13 @@
     .reveal code { color: var(--inftec-red); background: var(--inftec-light); padding: 2px 8px; border-radius: 4px; }
     .reveal ul, .reveal ol { text-align: left; }
 
-    .reveal .slides section {
-      border-top: 4px solid var(--inftec-orange);
-    }
-
-    /* Logo in bottom-right corner */
+    /* Logo in top-left corner */
     .reveal .slide-logo {
       position: fixed;
-      bottom: 20px;
-      right: 30px;
-      height: 30px;
-      opacity: 0.7;
+      top: 20px;
+      left: 30px;
+      height: 28px;
+      opacity: 0.6;
       z-index: 10;
     }
 
@@ -63,8 +59,7 @@
     <div class="slides">
       <section
         data-markdown="slides.md"
-        data-separator="^---$"
-        data-separator-vertical="^--$">
+        data-separator="^---$">
       </section>
     </div>
     <img src="logo.png" class="slide-logo" alt="InfTec">
@@ -96,7 +91,6 @@
             section.innerHTML = '';
             section.setAttribute('data-background-iframe', url);
             section.setAttribute('data-background-interactive', '');
-            section.style.borderTop = 'none';
           }
         }
       });

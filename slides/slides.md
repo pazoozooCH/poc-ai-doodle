@@ -18,7 +18,7 @@ Lunch Demo — 2026
 
 Can AI recognize your doodles?
 
---
+---
 
 ### How it works
 
@@ -29,7 +29,7 @@ Can AI recognize your doodles?
 - 28x28 pixel input, <1 MB model
 - Training: ~1.5 min on GPU
 
---
+---
 
 ### No cloud needed
 
@@ -39,7 +39,7 @@ The model runs **entirely on your device**
 - Classification every 300ms as you draw
 - Server only handles the leaderboard
 
---
+---
 
 ### Let's play!
 
@@ -47,11 +47,11 @@ Open on your phone:
 
 `http://???:3000`
 
---
+---
 
 <!-- leaderboard iframe inserted via HTML -->
 
---
+---
 
 ### Free Drawing Mode
 
@@ -60,11 +60,11 @@ What does the AI see when you draw?
 - Live top-5 predictions with confidence scores
 - Debug preview: the 28x28 pixels the model actually sees
 
---
+---
 
 <!-- freedraw iframe inserted via HTML -->
 
---
+---
 
 ### Watch AI Draw: Adversarial Examples
 
@@ -74,7 +74,7 @@ What does the AI see when you draw?
 
 *Self-driving cars, content filters, biometric systems...*
 
---
+---
 
 ### Teach it something new
 
@@ -85,11 +85,11 @@ Transfer learning with KNN on the feature space
 - No retraining needed — works instantly
 - Shared across all participants via WebSocket
 
---
+---
 
 <!-- train iframe inserted via HTML -->
 
---
+---
 
 ### Demo 1 Takeaways
 
@@ -104,7 +104,7 @@ Transfer learning with KNN on the feature space
 
 AI-assisted software development
 
---
+---
 
 ### Claude Code
 
@@ -113,13 +113,13 @@ AI-assisted software development
 - Iterates: writes → tests → fixes → commits
 - Not autocomplete — an autonomous coding agent
 
---
+---
 
 ### What we'll build
 
 *(live demo)*
 
---
+---
 
 ### Demo 2 Takeaways
 
@@ -135,6 +135,6 @@ AI-assisted software development
 2. Small models can be **surprisingly capable**
 3. AI is a **tool** — powerful but needs human judgement
 
---
+---
 
 ## Questions?
