@@ -20,10 +20,8 @@
       color: var(--inftec-light);
     }
 
-    .reveal, .reveal .slides, .reveal .slide-background { background: var(--inftec-dark); }
-    body { background: var(--inftec-dark); }
-    .reveal .slide-background { background-color: var(--inftec-dark) !important; }
-    .reveal section[data-background-iframe] { background: transparent !important; }
+    body, .reveal, .reveal .backgrounds { background: var(--inftec-dark); }
+    .reveal .slide-background-content { background: none !important; }
 
     .reveal h1, .reveal h2, .reveal h3 {
       text-transform: none;
