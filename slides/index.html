@@ -3,13 +3,59 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Lunch Demo</title>
+  <title>AI Lunch Demo - InfTec</title>
   <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/reveal.css">
-  <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/theme/black.css">
+  <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/theme/white.css">
   <style>
-    .reveal h1, .reveal h2, .reveal h3 { text-transform: none; }
+    :root {
+      --inftec-orange: #F18D0D;
+      --inftec-red: #ED1C24;
+      --inftec-yellow: #F9CA06;
+      --inftec-dark: #4D4D4D;
+      --inftec-light: #E6E7E8;
+    }
+
+    .reveal {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: var(--inftec-dark);
+    }
+
+    .reveal h1, .reveal h2, .reveal h3 {
+      text-transform: none;
+      color: var(--inftec-dark);
+      font-weight: 700;
+    }
+
+    .reveal h1 { color: var(--inftec-orange); }
+
+    .reveal strong { color: var(--inftec-orange); }
+    .reveal em { color: var(--inftec-dark); font-style: italic; }
+    .reveal code { color: var(--inftec-red); background: var(--inftec-light); padding: 2px 8px; border-radius: 4px; }
     .reveal ul, .reveal ol { text-align: left; }
-    .reveal code { color: #e94560; }
+
+    .reveal .slides section {
+      border-top: 4px solid var(--inftec-orange);
+    }
+
+    /* Logo in bottom-right corner */
+    .reveal .slide-logo {
+      position: fixed;
+      bottom: 20px;
+      right: 30px;
+      height: 30px;
+      opacity: 0.7;
+      z-index: 10;
+    }
+
+    /* Override link colors */
+    .reveal a { color: var(--inftec-orange); }
+    .reveal a:hover { color: var(--inftec-red); }
+
+    /* Slide number styling */
+    .reveal .slide-number { color: var(--inftec-dark); }
+
+    /* Progress bar */
+    .reveal .progress { color: var(--inftec-orange); }
   </style>
 </head>
 <body>
@@ -21,6 +67,7 @@
         data-separator-vertical="^--$">
       </section>
     </div>
+    <img src="logo.png" class="slide-logo" alt="InfTec">
   </div>
 
   <script src="https://unpkg.com/reveal.js@4/dist/reveal.js"></script>
@@ -31,6 +78,8 @@
       transition: 'slide',
       backgroundTransition: 'fade',
       plugins: [RevealMarkdown],
+      slideNumber: true,
+      progress: true,
       width: 1280,
       height: 720
     }).then(() => {
@@ -47,6 +96,7 @@
             section.innerHTML = '';
             section.setAttribute('data-background-iframe', url);
             section.setAttribute('data-background-interactive', '');
+            section.style.borderTop = 'none';
           }
         }
       });
