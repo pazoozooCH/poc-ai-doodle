@@ -27,6 +27,8 @@ export function getFeatureModel() { return featureModel; }
 export async function loadModels({ main = true, features = false } = {}) {
   ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
 
+  const sessionOpts = { executionProviders: ['wasm'] };
+
   const fetches = [];
   if (main) fetches.push(fetch('/model/model.onnx').then(r => r.arrayBuffer()));
   if (features) fetches.push(fetch('/model/feature_extractor.onnx').then(r => r.arrayBuffer()));
@@ -35,10 +37,10 @@ export async function loadModels({ main = true, features = false } = {}) {
   let idx = 0;
 
   if (main) {
-    mainModel = await ort.InferenceSession.create(new Uint8Array(buffers[idx++]));
+    mainModel = await ort.InferenceSession.create(new Uint8Array(buffers[idx++]), sessionOpts);
   }
   if (features) {
-    featureModel = await ort.InferenceSession.create(new Uint8Array(buffers[idx++]));
+    featureModel = await ort.InferenceSession.create(new Uint8Array(buffers[idx++]), sessionOpts);
   }
 
   return { mainModel, featureModel };
