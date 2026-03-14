@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Lunch Demo</title>
+  <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/reveal.css">
+  <link rel="stylesheet" href="https://unpkg.com/reveal.js@4/dist/theme/black.css">
+  <style>
+    .reveal h1, .reveal h2, .reveal h3 { text-transform: none; }
+    .reveal .subtitle { color: #888; font-size: 0.8em; }
+    .reveal .highlight { color: #e94560; }
+    .reveal .small { font-size: 0.6em; color: #888; }
+    .reveal ul { text-align: left; }
+    .reveal section img { border: none; box-shadow: none; background: none; }
+    .reveal .two-col { display: flex; gap: 40px; text-align: left; }
+    .reveal .two-col > div { flex: 1; }
+    .reveal code { color: #e94560; }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- ============ TITLE ============ -->
+      <section data-transition="zoom">
+        <h1>AI Today</h1>
+        <p class="subtitle">What can AI do in practice?</p>
+        <p class="small">Lunch Demo &mdash; 2026</p>
+      </section>
+
+      <!-- ============ AGENDA ============ -->
+      <section data-transition="fade">
+        <h2>Agenda</h2>
+        <ol>
+          <li><strong>Doodle Challenge</strong> &mdash; local AI in the browser</li>
+          <li><strong>Live Coding with Claude</strong> &mdash; AI-assisted development</li>
+          <li>Q&amp;A</li>
+        </ol>
+      </section>
+
+      <!-- ============ DEMO 1: DOODLE ============ -->
+      <section>
+        <!-- Intro -->
+        <section data-transition="slide">
+          <h2>Demo 1: <span class="highlight">Doodle Challenge</span></h2>
+          <p>Can AI recognize your doodles?</p>
+        </section>
+
+        <!-- How it works -->
+        <section data-transition="fade">
+          <h3>How it works</h3>
+          <div class="two-col">
+            <div>
+              <ul>
+                <li>CNN trained on Google's Quick, Draw! dataset</li>
+                <li>25 categories, 200k training samples</li>
+                <li>~90% accuracy on test data</li>
+                <li>Model runs <em>in your browser</em> (ONNX Runtime)</li>
+              </ul>
+            </div>
+            <div>
+              <ul>
+                <li>28&times;28 pixel input</li>
+                <li>3 conv layers &rarr; 128-dim features &rarr; classification</li>
+                <li>Training: ~1.5 min on GPU</li>
+                <li>Model size: &lt;1 MB</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Key point: runs locally -->
+        <section data-transition="fade">
+          <h3>No cloud needed</h3>
+          <p>The model runs <span class="highlight">entirely on your device</span></p>
+          <ul>
+            <li>No API calls, no latency, no data leaving your phone</li>
+            <li>Classification every 300ms as you draw</li>
+            <li>Server only handles the leaderboard</li>
+          </ul>
+        </section>
+
+        <!-- Let's play -->
+        <section data-transition="zoom">
+          <h2>Let's play!</h2>
+          <p>Open on your phone:</p>
+          <p style="font-size:1.5em"><code>http://<span class="highlight">???</span>:3000</code></p>
+          <p class="small">Leaderboard: /leaderboard.html</p>
+        </section>
+
+        <!-- Live game embed -->
+        <section data-background-iframe="http://localhost:3000/leaderboard.html" data-background-interactive>
+        </section>
+
+        <!-- Free draw -->
+        <section data-transition="fade">
+          <h3>Free Drawing Mode</h3>
+          <p>What does the AI see when you draw?</p>
+          <ul>
+            <li>Live top-5 predictions with confidence scores</li>
+            <li>Debug preview: the 28&times;28 pixels the model actually sees</li>
+          </ul>
+        </section>
+
+        <!-- Free draw embed -->
+        <section data-background-iframe="http://localhost:3000/freedraw.html" data-background-interactive>
+        </section>
+
+        <!-- Adversarial examples -->
+        <section data-transition="fade">
+          <h3>Watch AI Draw: <span class="highlight">Adversarial Examples</span></h3>
+          <ul>
+            <li>AI optimizes pixels to maximize a target category</li>
+            <li>Result: 95%+ confidence &mdash; but looks like noise to humans</li>
+            <li>This is why adversarial attacks on AI are a real problem</li>
+          </ul>
+          <p class="small">Self-driving cars, content filters, biometric systems...</p>
+        </section>
+
+        <!-- Custom categories -->
+        <section data-transition="fade">
+          <h3>Teach it something new</h3>
+          <p>Transfer learning with KNN on the feature space</p>
+          <ul>
+            <li>Draw 3&ndash;5 samples of a new category</li>
+            <li>Uses the CNN's 128-dim features + cosine similarity</li>
+            <li>No retraining needed &mdash; works instantly</li>
+            <li>Shared across all participants via WebSocket</li>
+          </ul>
+        </section>
+
+        <!-- Train embed -->
+        <section data-background-iframe="http://localhost:3000/train.html" data-background-interactive>
+        </section>
+
+        <!-- Takeaways -->
+        <section data-transition="fade">
+          <h3>Demo 1 Takeaways</h3>
+          <ul>
+            <li>AI models can be <strong>tiny</strong> (&lt;1 MB) and run locally</li>
+            <li>Training data quality matters more than quantity</li>
+            <li>Transfer learning: reuse features for new tasks</li>
+            <li>AI confidence &ne; human perception (adversarial examples)</li>
+          </ul>
+        </section>
+      </section>
+
+      <!-- ============ DEMO 2: CLAUDE CODE ============ -->
+      <section>
+        <section data-transition="slide">
+          <h2>Demo 2: <span class="highlight">Live Coding with Claude</span></h2>
+          <p>AI-assisted software development</p>
+        </section>
+
+        <section data-transition="fade">
+          <h3>Claude Code</h3>
+          <ul>
+            <li>CLI tool that understands your entire codebase</li>
+            <li>Reads files, writes code, runs commands</li>
+            <li>Iterates: writes &rarr; tests &rarr; fixes &rarr; commits</li>
+            <li>Not autocomplete &mdash; an autonomous coding agent</li>
+          </ul>
+        </section>
+
+        <section data-transition="fade">
+          <h3>What we'll build</h3>
+          <p><em>(live demo)</em></p>
+        </section>
+
+        <section data-transition="fade">
+          <h3>Demo 2 Takeaways</h3>
+          <ul>
+            <li>AI accelerates development, doesn't replace understanding</li>
+            <li>Best for: scaffolding, boilerplate, iteration, exploration</li>
+            <li>You still need to review, guide, and decide</li>
+          </ul>
+        </section>
+      </section>
+
+      <!-- ============ WRAP UP ============ -->
+      <section>
+        <section data-transition="zoom">
+          <h2>Key Messages</h2>
+          <ol>
+            <li>AI runs <strong>locally</strong> &mdash; not everything needs the cloud</li>
+            <li>Small models can be <strong>surprisingly capable</strong></li>
+            <li>AI is a <strong>tool</strong> &mdash; powerful but needs human judgement</li>
+          </ol>
+        </section>
+
+        <section data-transition="fade">
+          <h2>Questions?</h2>
+        </section>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/reveal.js@4/dist/reveal.js"></script>
+  <script src="https://unpkg.com/reveal.js@4/plugin/markdown/markdown.js"></script>
+  <script src="https://unpkg.com/reveal.js@4/plugin/zoom/zoom.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      transition: 'slide',
+      backgroundTransition: 'fade',
+      plugins: [RevealMarkdown, RevealZoom],
+      width: 1280,
+      height: 720
+    });
+  </script>
+</body>
+</html>
