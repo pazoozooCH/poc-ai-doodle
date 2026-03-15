@@ -290,7 +290,7 @@ function showSiFeedback(msg, type) {
   spawnParticles(type === 'hit' ? '#2ecc71' : '#e94560', type === 'hit' ? 30 : 15);
 }
 
-// ============ Particles (DOM-based, no canvas) ============
+// ============ Particles (DOM-based) ============
 function spawnParticles(color, count) {
   for (let i = 0; i < count; i++) {
     const dot = document.createElement('div');
@@ -300,27 +300,24 @@ function spawnParticles(color, count) {
     const dx = Math.cos(angle) * speed;
     const dy = Math.sin(angle) * speed;
 
-    Object.assign(dot.style, {
-      position: 'fixed',
-      left: '50%',
-      top: '50%',
-      width: size + 'px',
-      height: size + 'px',
-      borderRadius: '50%',
-      background: color,
-      pointerEvents: 'none',
-      zIndex: '200',
-      transition: 'all 0.6s cubic-bezier(0.25, 0, 0.5, 1)',
-      opacity: '1',
-    });
+    dot.style.cssText = `
+      position:fixed; left:50%; top:50%;
+      width:${size}px; height:${size}px;
+      margin-left:${-size/2}px; margin-top:${-size/2}px;
+      border-radius:50%; background:${color};
+      pointer-events:none; z-index:200;
+      transform:translate(0,0); opacity:1;
+    `;
     document.body.appendChild(dot);
 
-    requestAnimationFrame(() => {
-      dot.style.transform = `translate(${dx}px, ${dy}px)`;
-      dot.style.opacity = '0';
-    });
+    // Force layout before starting transition
+    dot.offsetWidth;
 
-    setTimeout(() => dot.remove(), 700);
+    dot.style.transition = 'transform 0.7s ease-out, opacity 0.7s ease-out';
+    dot.style.transform = `translate(${dx}px, ${dy}px)`;
+    dot.style.opacity = '0';
+
+    setTimeout(() => dot.remove(), 800);
   }
 }
 
