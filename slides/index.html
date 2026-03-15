@@ -475,8 +475,17 @@ Without the right training, results might be of **little value** or even **wrong
       plugins: [RevealMarkdown],
       slideNumber: true,
       progress: true,
+      overview: true,
       width: 1280,
       height: 720
+    });
+
+    // Disable iframe pointer events in overview so clicks navigate
+    Reveal.on('overviewshown', () => {
+      document.querySelectorAll('.iframe-slide iframe').forEach(f => f.style.pointerEvents = 'none');
+    });
+    Reveal.on('overviewhidden', () => {
+      document.querySelectorAll('.iframe-slide iframe').forEach(f => f.style.pointerEvents = '');
     });
 
     // Clock
