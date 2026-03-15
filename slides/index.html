@@ -61,6 +61,39 @@
     .reveal .progress { color: var(--inftec-orange); }
     .reveal .controls { color: var(--inftec-orange); }
 
+    /* Meme slides */
+    .meme-slide {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .meme-slide img {
+      max-height: 500px;
+      max-width: 90%;
+      border-radius: 8px;
+    }
+    .meme-container {
+      position: relative;
+      display: inline-block;
+    }
+    .meme-text {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      font-family: Impact, 'Arial Black', sans-serif;
+      color: white;
+      text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+      font-size: 1.4rem;
+      line-height: 1.2;
+      padding: 0 10px;
+    }
+    .meme-text.top { top: 8px; }
+    .meme-text.bottom { bottom: 8px; }
+    /* Drake meme specific */
+    .meme-text.drake-top { top: 15%; right: 5%; width: 45%; text-align: center; font-size: 1.1rem; }
+    .meme-text.drake-bottom { top: 65%; right: 5%; width: 45%; text-align: center; font-size: 1.1rem; }
+
     /* iframe slides need full height */
     .reveal .slides section .iframe-slide {
       height: 700px;
@@ -128,6 +161,17 @@ This entire demo application was built with:
 - &#x23F1;&#xFE0F; Done in **around half a day**
       </textarea></section>
 
+      <!-- Drake meme -->
+      <section>
+        <div class="meme-slide">
+          <div class="meme-container">
+            <img src="memes/drake.jpg">
+            <div class="meme-text drake-top">Writing code manually for days</div>
+            <div class="meme-text drake-bottom">Having AI build it in half a day</div>
+          </div>
+        </div>
+      </section>
+
       <!-- DEMO: DOODLE (vertical stack) -->
       <section>
         <section data-markdown><textarea data-template>
@@ -190,6 +234,17 @@ What does the AI see when you draw?
 
 *&#x1F697; Self-driving cars, &#x1F6E1;&#xFE0F; content filters, &#x1F9D1; biometric systems...*
         </textarea></section>
+
+        <!-- Surprised Pikachu meme -->
+        <section>
+          <div class="meme-slide">
+            <div class="meme-container">
+              <img src="memes/surprised-pikachu.jpg">
+              <div class="meme-text top">AI is 95% confident it's a cat</div>
+              <div class="meme-text bottom">Humans: "That's just random noise"</div>
+            </div>
+          </div>
+        </section>
 
         <section data-markdown><textarea data-template>
 ### &#x1F9E0; Teach it something new
@@ -290,6 +345,17 @@ My take on AI — now and in the near future
 2. &#x1F5A5;&#xFE0F; **Complex UIs** that are hard to test
         </textarea></section>
 
+        <!-- This Is Fine meme -->
+        <section>
+          <div class="meme-slide">
+            <div class="meme-container">
+              <img src="memes/this-is-fine.jpg">
+              <div class="meme-text top">AI confidently generating code</div>
+              <div class="meme-text bottom">In a codebase it doesn't understand</div>
+            </div>
+          </div>
+        </section>
+
         <section data-markdown><textarea data-template>
 ### &#x26A0;&#xFE0F; Using AI functionality in the app
 
@@ -297,6 +363,17 @@ Training might be challenging.
 
 Without the right training, results might be of **little value** or even **wrong**. &#x1F648;
         </textarea></section>
+
+        <!-- One Does Not Simply meme -->
+        <section>
+          <div class="meme-slide">
+            <div class="meme-container">
+              <img src="memes/one-does-not-simply.jpg">
+              <div class="meme-text top">One does not simply</div>
+              <div class="meme-text bottom">Train an AI model without good data</div>
+            </div>
+          </div>
+        </section>
 
         <section data-markdown><textarea data-template>
 ### &#x1F52E; How it will impact Software Developers
@@ -307,6 +384,16 @@ Without the right training, results might be of **little value** or even **wrong
 4. &#x1F465; Teams will likely get **smaller**, nearshoring may become less attractive
 5. &#x1F50E; **Non-technical roles** will extract info from the codebase directly
         </textarea></section>
+      </section>
+
+      <!-- Same Picture meme -->
+      <section>
+        <div class="meme-slide">
+          <div class="meme-container">
+            <img src="memes/same-picture.jpg">
+            <div class="meme-text top" style="font-size:1rem">"Senior developer" vs "Junior dev with AI"</div>
+          </div>
+        </div>
       </section>
 
       <!-- WRAP UP -->
