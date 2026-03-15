@@ -37,7 +37,23 @@ const WORD_LIST = [
 ];
 
 const players = new Map(); // socketId -> { name, score, streak, round, connected }
-const customCategories = {};
+
+// Custom categories with persistence
+const fs = require('fs');
+const CUSTOM_CATEGORIES_FILE = './custom-categories.json';
+let customCategories = {};
+try {
+  if (fs.existsSync(CUSTOM_CATEGORIES_FILE)) {
+    customCategories = JSON.parse(fs.readFileSync(CUSTOM_CATEGORIES_FILE, 'utf-8'));
+    console.log(`Loaded ${Object.keys(customCategories).length} custom categories from disk`);
+  }
+} catch (e) { console.error('Failed to load custom categories:', e.message); }
+
+function saveCustomCategories() {
+  try {
+    fs.writeFileSync(CUSTOM_CATEGORIES_FILE, JSON.stringify(customCategories));
+  } catch (e) { console.error('Failed to save custom categories:', e.message); }
+}
 
 let gameMode = 'quick-draw';   // 'quick-draw' | 'space-invaders'
 let gameState = 'lobby';       // 'lobby' | 'playing'
@@ -337,6 +353,7 @@ io.on('connection', (socket) => {
     if (!category || !features || features.length !== 128) return;
     if (!customCategories[category]) customCategories[category] = { samples: [] };
     customCategories[category].samples.push(features);
+    saveCustomCategories();
     io.emit('custom-categories', customCategories);
     console.log(`Custom category "${category}" now has ${customCategories[category].samples.length} samples`);
   });
@@ -344,6 +361,7 @@ io.on('connection', (socket) => {
   socket.on('remove-category', (category) => {
     if (customCategories[category]) {
       delete customCategories[category];
+      saveCustomCategories();
       io.emit('custom-categories', customCategories);
     }
   });

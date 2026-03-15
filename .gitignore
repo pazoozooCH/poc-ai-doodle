@@ -2,3 +2,4 @@ node_modules/
 train/data/
 train/.venv/
 train/__pycache__/
+custom-categories.json
