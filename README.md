@@ -19,7 +19,8 @@ Start the server (`npm run dev`) and open `http://localhost:3000/slides/`. The s
 |---|---|
 | Right / Left | Move between main topics |
 | Down / Up | Sub-slides within a topic |
-| Esc | Overview mode (bird's eye) |
+| Esc | Toggle overview mode (bird's eye) |
+| Enter | Jump to highlighted slide (in overview) |
 | Space | Next slide (linear) |
 
 ---
