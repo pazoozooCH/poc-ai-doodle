@@ -349,10 +349,12 @@ io.on('connection', (socket) => {
   });
 
   socket.on('add-sample', (data) => {
-    const { category, features } = data || {};
+    const { category, features, thumbnail } = data || {};
     if (!category || !features || features.length !== 128) return;
-    if (!customCategories[category]) customCategories[category] = { samples: [] };
+    if (!customCategories[category]) customCategories[category] = { samples: [], thumbnails: [] };
+    if (!customCategories[category].thumbnails) customCategories[category].thumbnails = [];
     customCategories[category].samples.push(features);
+    if (thumbnail) customCategories[category].thumbnails.push(thumbnail);
     saveCustomCategories();
     io.emit('custom-categories', customCategories);
     console.log(`Custom category "${category}" now has ${customCategories[category].samples.length} samples`);
