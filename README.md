@@ -56,7 +56,7 @@ A multiplayer browser game where players race to draw recognizable doodles. The 
 - **Frontend:** HTML Canvas + vanilla JS + ONNX Runtime Web
 - **Model:** CNN trained on Google Quick, Draw! dataset (25 categories), PyTorch -> ONNX
 - **Backend:** Node.js (Express) with WebSocket (Socket.io) for live leaderboard
-- **Networking:** All players connect via same WiFi to host machine's local IP (no accounts or tunnels needed)
+- **Networking:** Local WiFi or public via ngrok tunnel (see [Public Access via ngrok](#public-access-via-ngrok))
 
 ### Training the Model
 
@@ -132,6 +132,32 @@ Training page (`/train.html`) lets participants teach the model new categories u
 4. Classification uses cosine similarity against the feature vectors of training samples
 
 **Note:** Custom categories are stored in server memory and lost on restart.
+
+### Public Access via ngrok
+
+If participants can't reach the host machine over the local network (e.g. client isolation on corporate WiFi), you can expose the app via [ngrok](https://ngrok.com/):
+
+1. **Install ngrok** and authenticate (one-time):
+   ```bash
+   # install via snap, brew, or https://ngrok.com/download
+   sudo snap install ngrok        # Linux
+   brew install ngrok              # macOS
+
+   ngrok config add-authtoken <your-token>   # from https://dashboard.ngrok.com
+   ```
+
+2. **Start the app with ngrok** (two terminals):
+   ```bash
+   # Terminal 1: start ngrok tunnel
+   ngrok http 3000
+
+   # Terminal 2: start the app with the ngrok URL
+   BASE_URL=https://xxxx.ngrok-free.app npm run dev
+   ```
+
+   Copy the `Forwarding` URL from ngrok's output and use it as `BASE_URL`.
+
+3. The QR code on the leaderboard page will automatically use the ngrok URL.
 
 ### Non-Goals (keep it simple)
 

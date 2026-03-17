@@ -15,6 +15,7 @@ try {
 } catch (e) {}
 
 function getNetworkUrl() {
+  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/+$/, '');
   const nets = require('os').networkInterfaces();
   const localIp = Object.values(nets).flat()
     .find(n => n.family === 'IPv4' && !n.internal)?.address || 'localhost';
