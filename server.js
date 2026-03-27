@@ -67,6 +67,11 @@ const PLAYER_COLORS = [
 
 // ============ Helpers ============
 
+function sanitizeName(name) {
+  return name.trim().slice(0, 20);
+}
+
+
 function getPlayerList() {
   return Array.from(players.values())
     .filter(p => p.connected)
@@ -315,9 +320,9 @@ io.on('connection', (socket) => {
 
   // Player joins
   socket.on('join', (name) => {
-    if (!name || typeof name !== 'string') return;
+    if (!name || typeof name !== 'string' || name.trim().length === 0) return;
     players.set(socket.id, {
-      name: name.trim(),
+      name: sanitizeName(name),
       score: 0,
       streak: 0,
       round: 0,
@@ -382,7 +387,9 @@ io.on('connection', (socket) => {
   });
 
   // Quick Draw: round result
-  socket.on('round-result', ({ success, timeTaken }) => {
+  socket.on('round-result', (data) => {
+    if (!data || typeof data.success !== 'boolean' || typeof data.timeTaken !== 'number') return;
+    const { success, timeTaken } = data;
     const player = players.get(socket.id);
     if (!player || gameMode !== 'quick-draw' || gameState !== 'playing') return;
 
@@ -399,7 +406,9 @@ io.on('connection', (socket) => {
   });
 
   // Space Invaders: player shoots
-  socket.on('si-shoot', ({ category, confidence }) => {
+  socket.on('si-shoot', (data) => {
+    if (!data || typeof data.category !== 'string' || typeof data.confidence !== 'number') return;
+    const { category, confidence } = data;
     const player = players.get(socket.id);
     if (!player || gameMode !== 'space-invaders' || gameState !== 'playing') return;
 
@@ -432,15 +441,18 @@ io.on('connection', (socket) => {
 
   // Space Invaders: config changes
   socket.on('si-config', (config) => {
-    if (config.difficulty !== undefined) SI_CONFIG.difficulty = config.difficulty;
-    if (config.spawnInterval !== undefined) {
+    if (!config || typeof config !== 'object') return;
+    if (typeof config.difficulty === 'number' && config.difficulty >= 0 && config.difficulty <= 1) {
+      SI_CONFIG.difficulty = config.difficulty;
+    }
+    if (typeof config.spawnInterval === 'number' && config.spawnInterval >= 500 && config.spawnInterval <= 30000) {
       SI_CONFIG.spawnInterval = config.spawnInterval;
       if (spawnTimer) {
         clearInterval(spawnTimer);
         spawnTimer = setInterval(spawnInvader, SI_CONFIG.spawnInterval);
       }
     }
-    if (config.moveInterval !== undefined) {
+    if (typeof config.moveInterval === 'number' && config.moveInterval >= 500 && config.moveInterval <= 30000) {
       SI_CONFIG.moveInterval = config.moveInterval;
       if (moveTimer) {
         clearInterval(moveTimer);
@@ -451,7 +463,9 @@ io.on('connection', (socket) => {
   });
 
   // Tic-Tac-Toe: player claims a cell
-  socket.on('ttt-claim', ({ category, confidence }) => {
+  socket.on('ttt-claim', (data) => {
+    if (!data || typeof data.category !== 'string' || typeof data.confidence !== 'number') return;
+    const { category, confidence } = data;
     const player = players.get(socket.id);
     if (!player || gameMode !== 'tic-tac-toe' || gameState !== 'playing' || tttWinner) return;
 
@@ -523,6 +537,14 @@ io.on('connection', (socket) => {
       player.connected = false;
       broadcastFullState();
       console.log(`${player.name} disconnected`);
+      // Clean up player data after 5 minutes
+      setTimeout(() => {
+        const p = players.get(socket.id);
+        if (p && !p.connected) {
+          players.delete(socket.id);
+          tttPlayerColors.delete(socket.id);
+        }
+      }, 5 * 60 * 1000);
     }
   });
 });

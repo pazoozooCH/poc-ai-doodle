@@ -8,6 +8,12 @@ const socket = io();
 const playerName = sessionStorage.getItem('playerName');
 if (!playerName) window.location.href = '/';
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 socket.emit('join', playerName);
 syncCustomCategories(socket);
 
@@ -35,7 +41,7 @@ socket.on('full-state', ({ gameMode, gameState, players }) => {
   const lobbyCount = document.getElementById('lobby-count');
   if (lobbyPlayers) {
     lobbyPlayers.innerHTML = players.map(p =>
-      `<span style="display:inline-block;padding:6px 14px;margin:3px;background:#16213e;border-radius:20px;font-size:0.9rem">${p.name}</span>`
+      `<span style="display:inline-block;padding:6px 14px;margin:3px;background:#16213e;border-radius:20px;font-size:0.9rem">${escapeHtml(p.name)}</span>`
     ).join('') || 'Waiting...';
   }
   if (lobbyCount) lobbyCount.textContent = `${players.length} player${players.length !== 1 ? 's' : ''}`;
@@ -366,7 +372,7 @@ function renderTTTBoard(board, winner) {
     return `<div class="${classes.join(' ')}" style="border-color:${borderColor};background:${bgColor}">
       ${imgHtml}
       <span class="ttt-cell-label">${cell.category}</span>
-      ${owned ? `<span class="ttt-cell-owner">${owned.name}</span>` : ''}
+      ${owned ? `<span class="ttt-cell-owner">${escapeHtml(owned.name)}</span>` : ''}
     </div>`;
   }).join('');
 }
@@ -405,7 +411,7 @@ socket.on('ttt-state', (state) => {
       banner.innerHTML = `It's a draw!`;
       banner.style.color = '#888';
     } else {
-      banner.innerHTML = `<span style="color:${state.winner.color}">${state.winner.name}</span> wins!`;
+      banner.innerHTML = `<span style="color:${state.winner.color}">${escapeHtml(state.winner.name)}</span> wins!`;
       banner.style.color = state.winner.color;
     }
     banner.style.display = 'block';

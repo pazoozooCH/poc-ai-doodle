@@ -1,5 +1,11 @@
 const socket = io();
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 // ============ State ============
 let currentMode = 'quick-draw';
 let currentState = 'lobby';
@@ -63,7 +69,7 @@ socket.on('full-state', ({ gameMode, gameState, players, leaderboard, playerColo
     lobbyList.innerHTML = '<p class="no-players">Waiting for players to join...</p>';
   } else {
     lobbyList.innerHTML = players.map(p =>
-      `<div style="display:inline-block;padding:8px 16px;margin:4px;background:#16213e;border-radius:20px;font-size:0.95rem">${p.name}</div>`
+      `<div style="display:inline-block;padding:8px 16px;margin:4px;background:#16213e;border-radius:20px;font-size:0.95rem">${escapeHtml(p.name)}</div>`
     ).join('');
   }
   document.getElementById('lobby-count').textContent = `${players.length} player${players.length !== 1 ? 's' : ''} joined`;
@@ -83,7 +89,7 @@ function updateLeaderboard(players) {
       const streakText = p.streak >= 2 ? `<span class="streak-fire">${'\u{1F525}'.repeat(Math.min(p.streak, 5))}</span>` : '';
       return `<tr>
         <td class="${rankClass}">${p.rank}</td>
-        <td>${p.name}</td>
+        <td>${escapeHtml(p.name)}</td>
         <td>${p.score}</td>
         <td>${streakText}</td>
         <td>${p.round} / ${p.totalRounds}</td>
@@ -108,7 +114,7 @@ function updateLeaderboard(players) {
       tttScores.innerHTML = players.map(p => {
         const color = currentPlayerColors[p.name] || '#888';
         return `<div class="ttt-player-score">
-          <span><span class="ttt-player-color-dot" style="background:${color}"></span>${p.name}</span>
+          <span><span class="ttt-player-color-dot" style="background:${color}"></span>${escapeHtml(p.name)}</span>
           <span style="color:${color};font-weight:600">${p.score}</span>
         </div>`;
       }).join('');
@@ -123,7 +129,7 @@ function updateLeaderboard(players) {
     } else {
       siScores.innerHTML = players.slice(0, 10).map(p =>
         `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1a1a2e;font-size:0.85rem">
-          <span>${p.name}</span>
+          <span>${escapeHtml(p.name)}</span>
           <span style="color:#e94560;font-weight:600">${p.score}</span>
         </div>`
       ).join('');
@@ -283,7 +289,7 @@ function renderTTTHost(state) {
     return `<div class="${classes.join(' ')}" style="border-color:${borderColor};background:${bgColor}">
       ${imgHtml}
       <span>${cell.category}</span>
-      ${owned ? `<span class="cell-owner" style="color:${owned.color}">${owned.name}</span>` : ''}
+      ${owned ? `<span class="cell-owner" style="color:${owned.color}">${escapeHtml(owned.name)}</span>` : ''}
     </div>`;
   }).join('');
 
@@ -293,7 +299,7 @@ function renderTTTHost(state) {
       winnerEl.innerHTML = `It's a draw!`;
       winnerEl.style.color = '#888';
     } else {
-      winnerEl.innerHTML = `<span style="color:${state.winner.color}">${state.winner.name}</span> wins!`;
+      winnerEl.innerHTML = `<span style="color:${state.winner.color}">${escapeHtml(state.winner.name)}</span> wins!`;
     }
     winnerEl.style.display = 'block';
   } else {
@@ -308,7 +314,7 @@ function renderTTTHost(state) {
     } else {
       scoresEl.innerHTML = entries.map(([name, color]) =>
         `<div class="ttt-player-score">
-          <span><span class="ttt-player-color-dot" style="background:${color}"></span>${name}</span>
+          <span><span class="ttt-player-color-dot" style="background:${color}"></span>${escapeHtml(name)}</span>
         </div>`
       ).join('');
     }
