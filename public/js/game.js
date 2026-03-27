@@ -17,6 +17,7 @@ const views = {
   lobby: document.getElementById('lobby'),
   qdGame: document.getElementById('game'),
   siGame: document.getElementById('si-game'),
+  tttGame: document.getElementById('ttt-game'),
   gameOver: document.getElementById('game-over'),
 };
 
@@ -38,7 +39,7 @@ socket.on('full-state', ({ gameMode, gameState, players }) => {
     ).join('') || 'Waiting...';
   }
   if (lobbyCount) lobbyCount.textContent = `${players.length} player${players.length !== 1 ? 's' : ''}`;
-  if (lobbyMode) lobbyMode.textContent = gameMode === 'quick-draw' ? 'Quick Draw' : 'Space Invaders';
+  if (lobbyMode) lobbyMode.textContent = gameMode === 'quick-draw' ? 'Quick Draw' : gameMode === 'space-invaders' ? 'Space Invaders' : 'Tic-Tac-Toe';
 
   // Handle state transitions
   if (gameState === 'lobby' && currentView !== 'lobby' && currentView !== 'loading') {
@@ -48,6 +49,8 @@ socket.on('full-state', ({ gameMode, gameState, players }) => {
     clearInterval(timerInterval);
     clearInterval(classifyInterval);
     clearInterval(siClassifyInterval);
+    clearInterval(tttClassifyInterval);
+    tttClassifyInterval = null;
   }
 });
 
@@ -319,6 +322,177 @@ function spawnParticles(color, count) {
 
     setTimeout(() => dot.remove(), 800);
   }
+}
+
+// ============ Tic-Tac-Toe ============
+let tttDrawer = null;
+let tttClassifyInterval = null;
+let tttBoard = [];
+let tttMyColor = '#888';
+let tttScore = 0;
+let tttStreak = 0;
+
+// Cache doodle sample images
+let tttSampleImages = {};
+fetch('/model/samples.json')
+  .then(r => r.json())
+  .then(data => { tttSampleImages = data; })
+  .catch(() => {});
+
+function initTTT() {
+  if (tttDrawer) return;
+  tttDrawer = initCanvas(document.getElementById('ttt-canvas'), {
+    clearButton: document.getElementById('ttt-clear')
+  });
+}
+
+function renderTTTBoard(board, winner) {
+  const container = document.getElementById('ttt-board');
+  container.innerHTML = board.map((cell, i) => {
+    const owned = cell.owner;
+    const isWinCell = winner && winner.line && winner.line.includes(i);
+    const borderColor = owned ? owned.color : '#333';
+    const bgColor = owned ? owned.color + '30' : '#16213e';
+    const classes = ['ttt-cell'];
+    if (owned) classes.push('claimed');
+    if (isWinCell) classes.push('winning-cell');
+
+    // Try to get a doodle image
+    let imgHtml = '';
+    if (tttSampleImages[cell.category] && tttSampleImages[cell.category].length > 0) {
+      imgHtml = `<img src="data:image/png;base64,${tttSampleImages[cell.category][0]}" alt="${cell.category}">`;
+    }
+
+    return `<div class="${classes.join(' ')}" style="border-color:${borderColor};background:${bgColor}">
+      ${imgHtml}
+      <span class="ttt-cell-label">${cell.category}</span>
+      ${owned ? `<span class="ttt-cell-owner">${owned.name}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+socket.on('ttt-state', (state) => {
+  tttBoard = state.board;
+
+  if (state.running && currentView !== 'tttGame') {
+    initTTT();
+    showView('tttGame');
+    currentView = 'tttGame';
+
+    if (!tttClassifyInterval) {
+      tttClassifyInterval = setInterval(tttClassifyLive, 400);
+    }
+    const claimBtn = document.getElementById('ttt-claim');
+    if (claimBtn && !claimBtn._wired) {
+      claimBtn.addEventListener('click', tttClaim);
+      claimBtn._wired = true;
+    }
+  }
+
+  if (!state.running && currentView === 'tttGame') {
+    clearInterval(tttClassifyInterval);
+    tttClassifyInterval = null;
+    showView('lobby');
+    currentView = 'lobby';
+  }
+
+  renderTTTBoard(state.board, state.winner);
+
+  // Show winner banner
+  const banner = document.getElementById('ttt-winner-banner');
+  if (state.winner) {
+    if (state.winner.name === 'Nobody') {
+      banner.innerHTML = `It's a draw!`;
+      banner.style.color = '#888';
+    } else {
+      banner.innerHTML = `<span style="color:${state.winner.color}">${state.winner.name}</span> wins!`;
+      banner.style.color = state.winner.color;
+    }
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  // Update my color indicator
+  if (state.playerColors && state.playerColors[playerName]) {
+    tttMyColor = state.playerColors[playerName];
+    const colorDot = document.getElementById('ttt-my-color');
+    if (colorDot) colorDot.style.background = tttMyColor;
+  }
+});
+
+socket.on('ttt-miss', ({ category, reason }) => {
+  const msg = reason === 'no-match' ? `"${category}" not available!` : 'Not confident enough!';
+  showTTTFeedback(msg, 'miss');
+});
+
+socket.on('full-state', ({ leaderboard, playerColors }) => {
+  const me = leaderboard.find(p => p.name === playerName);
+  if (me && document.getElementById('ttt-score')) {
+    tttScore = me.score;
+    tttStreak = me.streak;
+    document.getElementById('ttt-score').textContent = `Score: ${tttScore}`;
+    document.getElementById('ttt-streak').textContent = tttStreak >= 2 ? '\u{1F525}'.repeat(Math.min(tttStreak, 5)) : '';
+  }
+  if (playerColors && playerColors[playerName]) {
+    tttMyColor = playerColors[playerName];
+    const colorDot = document.getElementById('ttt-my-color');
+    if (colorDot) colorDot.style.background = tttMyColor;
+  }
+});
+
+async function tttClassifyLive() {
+  if (!tttDrawer || !tttDrawer.state.hasStrokes) return;
+  const { tensor } = preprocessCanvas(tttDrawer.canvas);
+  const results = await classify(tensor);
+
+  const container = document.getElementById('ttt-predictions');
+  if (container) {
+    // Highlight predictions that match unclaimed board cells
+    const unclaimed = new Set(tttBoard.filter(c => !c.owner).map(c => c.category));
+    container.innerHTML = results.slice(0, 5).map(r => {
+      const pct = (r.prob * 100).toFixed(0);
+      const isMatch = unclaimed.has(r.label);
+      return `<span class="prediction-tag ${isMatch ? 'match' : ''}">${r.label} ${pct}%</span>`;
+    }).join('');
+  }
+}
+
+async function tttClaim() {
+  if (!tttDrawer || !tttDrawer.state.hasStrokes) return;
+  const { tensor } = preprocessCanvas(tttDrawer.canvas);
+  const results = await classify(tensor);
+
+  if (results.length > 0) {
+    // Find the best result that matches an unclaimed cell
+    const unclaimed = new Set(tttBoard.filter(c => !c.owner).map(c => c.category));
+    const match = results.find(r => unclaimed.has(r.label));
+    if (match) {
+      socket.emit('ttt-claim', { category: match.label, confidence: match.prob });
+      tttDrawer.clear();
+      document.getElementById('ttt-predictions').innerHTML = '';
+      showTTTFeedback(`Claiming "${match.label}"...`, 'hit');
+    } else {
+      showTTTFeedback('No matching square found!', 'miss');
+    }
+  }
+}
+
+let tttFeedbackTimeout = null;
+function showTTTFeedback(msg, type) {
+  const el = document.getElementById('ttt-feedback');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'si-feedback ' + type;
+  clearTimeout(tttFeedbackTimeout);
+  tttFeedbackTimeout = setTimeout(() => { el.textContent = ''; el.className = 'si-feedback'; }, 2000);
+
+  const flash = document.getElementById('flash-overlay');
+  if (flash) {
+    flash.className = 'flash-overlay ' + (type === 'hit' ? 'flash-hit' : 'flash-miss');
+    setTimeout(() => { flash.className = 'flash-overlay'; }, 300);
+  }
+  if (type === 'hit') spawnParticles('#2ecc71', 20);
 }
 
 // ============ Init ============

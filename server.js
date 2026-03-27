@@ -56,8 +56,14 @@ function saveCustomCategories() {
   } catch (e) { console.error('Failed to save custom categories:', e.message); }
 }
 
-let gameMode = 'quick-draw';   // 'quick-draw' | 'space-invaders'
+let gameMode = 'quick-draw';   // 'quick-draw' | 'space-invaders' | 'tic-tac-toe'
 let gameState = 'lobby';       // 'lobby' | 'playing'
+
+// Player color palette for tic-tac-toe
+const PLAYER_COLORS = [
+  '#e94560', '#2ecc71', '#3498db', '#f39c12', '#9b59b6',
+  '#1abc9c', '#e67e22', '#e74c3c', '#00cec9', '#fd79a8',
+];
 
 // ============ Helpers ============
 
@@ -82,11 +88,19 @@ function getLeaderboard() {
 }
 
 function broadcastFullState() {
+  // Build player color map for TTT
+  const playerColorMap = {};
+  for (const [socketId, color] of tttPlayerColors) {
+    const player = players.get(socketId);
+    if (player) playerColorMap[player.name] = color;
+  }
+
   io.emit('full-state', {
     gameMode,
     gameState,
     players: getPlayerList(),
     leaderboard: getLeaderboard(),
+    playerColors: playerColorMap,
   });
 }
 
@@ -204,6 +218,88 @@ function broadcastSIState() {
   });
 }
 
+// ============ Tic-Tac-Toe ============
+
+const TTT_CONFIG = {
+  confidenceThreshold: 0.3,
+};
+
+let tttBoard = []; // 9 cells: { category, owner: null | { name, color, socketId } }
+let tttWinner = null;
+let tttPlayerColors = new Map(); // socketId -> color
+let tttColorIndex = 0;
+
+function assignPlayerColor(socketId) {
+  if (!tttPlayerColors.has(socketId)) {
+    tttPlayerColors.set(socketId, PLAYER_COLORS[tttColorIndex % PLAYER_COLORS.length]);
+    tttColorIndex++;
+  }
+  return tttPlayerColors.get(socketId);
+}
+
+function getPlayerColor(socketId) {
+  return tttPlayerColors.get(socketId) || '#888';
+}
+
+function startTicTacToe() {
+  gameState = 'playing';
+  tttWinner = null;
+  tttColorIndex = 0;
+  tttPlayerColors.clear();
+
+  // Pick 9 unique random categories
+  const shuffled = [...WORD_LIST].sort(() => Math.random() - 0.5);
+  const categories = shuffled.slice(0, 9);
+  tttBoard = categories.map(cat => ({ category: cat, owner: null }));
+
+  // Assign colors and reset scores
+  for (const [socketId, player] of players) {
+    if (player.connected) {
+      assignPlayerColor(socketId);
+      player.score = 0;
+      player.streak = 0;
+    }
+  }
+
+  broadcastTTTState();
+  broadcastFullState();
+}
+
+function checkTTTWin() {
+  const lines = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+    [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
+    [0, 4, 8], [2, 4, 6],             // diagonals
+  ];
+  for (const [a, b, c] of lines) {
+    const oa = tttBoard[a].owner;
+    const ob = tttBoard[b].owner;
+    const oc = tttBoard[c].owner;
+    if (oa && ob && oc && oa.socketId === ob.socketId && ob.socketId === oc.socketId) {
+      return { name: oa.name, color: oa.color, line: [a, b, c] };
+    }
+  }
+  return null;
+}
+
+function broadcastTTTState() {
+  const playerColorMap = {};
+  for (const [socketId, color] of tttPlayerColors) {
+    const player = players.get(socketId);
+    if (player) playerColorMap[player.name] = color;
+  }
+
+  io.emit('ttt-state', {
+    board: tttBoard.map(cell => ({
+      category: cell.category,
+      owner: cell.owner ? { name: cell.owner.name, color: cell.owner.color } : null,
+    })),
+    winner: tttWinner,
+    playerColors: playerColorMap,
+    running: gameState === 'playing' && gameMode === 'tic-tac-toe',
+  });
+}
+
 // ============ Socket handlers ============
 
 io.on('connection', (socket) => {
@@ -245,6 +341,11 @@ io.on('connection', (socket) => {
     if (gameState === 'playing' && gameMode === 'space-invaders') {
       broadcastSIState();
     }
+    // If Tic-Tac-Toe is running, assign color and send state
+    if (gameState === 'playing' && gameMode === 'tic-tac-toe') {
+      assignPlayerColor(socket.id);
+      broadcastTTTState();
+    }
   });
 
   // Host: start game
@@ -252,16 +353,19 @@ io.on('connection', (socket) => {
     console.log(`Starting ${gameMode}...`);
     if (gameMode === 'quick-draw') startQuickDraw();
     else if (gameMode === 'space-invaders') startSpaceInvaders();
+    else if (gameMode === 'tic-tac-toe') startTicTacToe();
   });
 
   // Host: switch mode (goes back to lobby)
   socket.on('set-game-mode', (mode) => {
-    if (mode !== 'quick-draw' && mode !== 'space-invaders') return;
+    if (!['quick-draw', 'space-invaders', 'tic-tac-toe'].includes(mode)) return;
     if (gameMode === 'space-invaders') stopSITimers();
     gameMode = mode;
     gameState = 'lobby';
     siGameOver = false;
+    tttWinner = null;
     broadcastFullState();
+    if (mode === 'tic-tac-toe') broadcastTTTState();
     console.log(`Mode changed to: ${gameMode}`);
   });
 
@@ -270,8 +374,10 @@ io.on('connection', (socket) => {
     if (gameMode === 'space-invaders') stopSITimers();
     gameState = 'lobby';
     siGameOver = false;
+    tttWinner = null;
     broadcastFullState();
     broadcastSIState();
+    broadcastTTTState();
     console.log('Game stopped, back to lobby');
   });
 
@@ -342,6 +448,48 @@ io.on('connection', (socket) => {
       }
     }
     broadcastSIState();
+  });
+
+  // Tic-Tac-Toe: player claims a cell
+  socket.on('ttt-claim', ({ category, confidence }) => {
+    const player = players.get(socket.id);
+    if (!player || gameMode !== 'tic-tac-toe' || gameState !== 'playing' || tttWinner) return;
+
+    // Find the matching unclaimed cell
+    const cellIdx = tttBoard.findIndex(c => c.category === category && !c.owner);
+    if (cellIdx === -1) {
+      socket.emit('ttt-miss', { category, reason: 'no-match' });
+      return;
+    }
+
+    if (confidence < TTT_CONFIG.confidenceThreshold) {
+      socket.emit('ttt-miss', { category, reason: 'too-low' });
+      return;
+    }
+
+    // Claim the cell
+    const color = getPlayerColor(socket.id);
+    tttBoard[cellIdx].owner = { name: player.name, color, socketId: socket.id };
+    player.score += 100;
+    player.streak++;
+    console.log(`${player.name} claimed "${category}" (cell ${cellIdx})`);
+
+    // Check for winner
+    const win = checkTTTWin();
+    if (win) {
+      tttWinner = win;
+      win.name === player.name && (player.score += 500);
+      console.log(`${win.name} wins tic-tac-toe!`);
+    }
+
+    // Check for draw (all cells claimed, no winner)
+    if (!tttWinner && tttBoard.every(c => c.owner)) {
+      tttWinner = { name: 'Nobody', color: '#888', line: [] };
+      console.log('Tic-tac-toe ended in a draw');
+    }
+
+    broadcastTTTState();
+    broadcastFullState();
   });
 
   // Custom categories

@@ -30,6 +30,84 @@
     }
     .mode-btn:hover { border-color: #e94560; }
 
+    /* Tic-Tac-Toe display */
+    .ttt-host-layout {
+      display: flex;
+      gap: 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+      align-items: flex-start;
+    }
+    .ttt-host-board-area { flex: 2; }
+    .ttt-host-scores-area { flex: 1; min-width: 200px; }
+    .ttt-host-scores-area h3 { color: #888; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .ttt-host-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .ttt-host-cell {
+      aspect-ratio: 1;
+      background: #16213e;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #ccc;
+      border: 4px solid #333;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .ttt-host-cell.claimed { transform: scale(0.97); }
+    .ttt-host-cell img {
+      width: 45%;
+      height: 45%;
+      object-fit: contain;
+      filter: invert(1);
+      opacity: 0.5;
+    }
+    .ttt-host-cell.claimed img { opacity: 0.25; }
+    .ttt-host-cell .cell-owner {
+      font-size: 0.85rem;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+    .ttt-host-cell.winning-cell {
+      animation: tttWinPulse 0.6s ease-in-out infinite alternate;
+    }
+    @keyframes tttWinPulse {
+      from { transform: scale(0.97); }
+      to { transform: scale(1.04); }
+    }
+    .ttt-host-winner {
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      padding: 20px;
+      animation: pop 0.3s ease-out;
+    }
+    .ttt-player-score {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #1a1a2e;
+      font-size: 0.95rem;
+    }
+    .ttt-player-color-dot {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
     /* Space Invaders display */
     #si-container { position: relative; }
     #si-canvas {
@@ -136,6 +214,7 @@
     <div class="mode-switcher">
       <button class="mode-btn active" data-mode="quick-draw">Quick Draw</button>
       <button class="mode-btn" data-mode="space-invaders">Space Invaders</button>
+      <button class="mode-btn" data-mode="tic-tac-toe">Tic-Tac-Toe</button>
     </div>
 
     <!-- Game controls -->
@@ -158,6 +237,20 @@
     <div id="qd-container" style="display:none">
       <div id="leaderboard-content">
         <p class="no-players">No scores yet</p>
+      </div>
+    </div>
+
+    <!-- Tic-Tac-Toe -->
+    <div id="ttt-container" style="display:none">
+      <div id="ttt-host-winner" class="ttt-host-winner" style="display:none"></div>
+      <div class="ttt-host-layout">
+        <div class="ttt-host-board-area">
+          <div class="ttt-host-board" id="ttt-host-board"></div>
+        </div>
+        <div class="ttt-host-scores-area">
+          <h3>Players</h3>
+          <div id="ttt-host-scores"></div>
+        </div>
       </div>
     </div>
 

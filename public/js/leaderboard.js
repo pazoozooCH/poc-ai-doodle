@@ -3,12 +3,14 @@ const socket = io();
 // ============ State ============
 let currentMode = 'quick-draw';
 let currentState = 'lobby';
+let currentPlayerColors = {};
 
 // ============ DOM refs ============
 const modeBtns = document.querySelectorAll('.mode-btn');
 const lobbyContainer = document.getElementById('lobby-container');
 const qdContainer = document.getElementById('qd-container');
 const siContainer = document.getElementById('si-container');
+const tttContainer = document.getElementById('ttt-container');
 const startBtn = document.getElementById('btn-start-game');
 const stopBtn = document.getElementById('btn-stop-game');
 
@@ -28,9 +30,10 @@ stopBtn.addEventListener('click', () => {
 });
 
 // ============ Full state updates ============
-socket.on('full-state', ({ gameMode, gameState, players, leaderboard }) => {
+socket.on('full-state', ({ gameMode, gameState, players, leaderboard, playerColors }) => {
   currentMode = gameMode;
   currentState = gameState;
+  currentPlayerColors = playerColors || {};
 
   // Update mode buttons
   modeBtns.forEach(btn => {
@@ -41,11 +44,14 @@ socket.on('full-state', ({ gameMode, gameState, players, leaderboard }) => {
   const isLobby = gameState === 'lobby';
   const isPlaying = gameState === 'playing';
   const isSI = gameMode === 'space-invaders';
-  // Lobby: show for quick-draw lobby only (SI has its own layout)
+  const isTTT = gameMode === 'tic-tac-toe';
+  // Lobby: show for quick-draw and tic-tac-toe lobby
   lobbyContainer.style.display = isLobby && !isSI ? '' : 'none';
-  qdContainer.style.display = isPlaying && !isSI ? '' : 'none';
+  qdContainer.style.display = isPlaying && !isSI && !isTTT ? '' : 'none';
   // SI container: show whenever SI mode is selected
   siContainer.style.display = isSI ? '' : 'none';
+  // TTT container: show whenever TTT mode is selected
+  tttContainer.style.display = isTTT ? '' : 'none';
 
   // Start/stop buttons
   startBtn.style.display = gameState === 'lobby' ? '' : 'none';
@@ -91,6 +97,22 @@ function updateLeaderboard(players) {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
+  }
+
+  // TTT sidebar scores with colors
+  const tttScores = document.getElementById('ttt-host-scores');
+  if (tttScores && currentMode === 'tic-tac-toe') {
+    if (players.length === 0) {
+      tttScores.innerHTML = '<p style="color:#555;font-size:0.85rem">Waiting for players...</p>';
+    } else {
+      tttScores.innerHTML = players.map(p => {
+        const color = currentPlayerColors[p.name] || '#888';
+        return `<div class="ttt-player-score">
+          <span><span class="ttt-player-color-dot" style="background:${color}"></span>${p.name}</span>
+          <span style="color:${color};font-weight:600">${p.score}</span>
+        </div>`;
+      }).join('');
+    }
   }
 
   // SI sidebar scores/players
@@ -230,6 +252,68 @@ socket.on('si-miss-feed', ({ playerName, category, reason }) => {
   feed.prepend(entry);
   while (feed.children.length > 20) feed.lastChild.remove();
 });
+
+// ============ Tic-Tac-Toe Display ============
+
+socket.on('ttt-state', (state) => {
+  renderTTTHost(state);
+});
+
+function renderTTTHost(state) {
+  const boardEl = document.getElementById('ttt-host-board');
+  const winnerEl = document.getElementById('ttt-host-winner');
+  const scoresEl = document.getElementById('ttt-host-scores');
+  if (!boardEl) return;
+
+  // Render board
+  boardEl.innerHTML = state.board.map((cell, i) => {
+    const owned = cell.owner;
+    const isWinCell = state.winner && state.winner.line && state.winner.line.includes(i);
+    const borderColor = owned ? owned.color : '#333';
+    const bgColor = owned ? owned.color + '30' : '#16213e';
+    const classes = ['ttt-host-cell'];
+    if (owned) classes.push('claimed');
+    if (isWinCell) classes.push('winning-cell');
+
+    let imgHtml = '';
+    if (sampleImages[cell.category] && sampleImages[cell.category].length > 0) {
+      imgHtml = `<img src="data:image/png;base64,${sampleImages[cell.category][0]}" alt="${cell.category}">`;
+    }
+
+    return `<div class="${classes.join(' ')}" style="border-color:${borderColor};background:${bgColor}">
+      ${imgHtml}
+      <span>${cell.category}</span>
+      ${owned ? `<span class="cell-owner" style="color:${owned.color}">${owned.name}</span>` : ''}
+    </div>`;
+  }).join('');
+
+  // Winner banner
+  if (state.winner) {
+    if (state.winner.name === 'Nobody') {
+      winnerEl.innerHTML = `It's a draw!`;
+      winnerEl.style.color = '#888';
+    } else {
+      winnerEl.innerHTML = `<span style="color:${state.winner.color}">${state.winner.name}</span> wins!`;
+    }
+    winnerEl.style.display = 'block';
+  } else {
+    winnerEl.style.display = 'none';
+  }
+
+  // Player scores with colors
+  if (scoresEl && state.playerColors) {
+    const entries = Object.entries(state.playerColors);
+    if (entries.length === 0) {
+      scoresEl.innerHTML = '<p style="color:#555;font-size:0.85rem">Waiting for players...</p>';
+    } else {
+      scoresEl.innerHTML = entries.map(([name, color]) =>
+        `<div class="ttt-player-score">
+          <span><span class="ttt-player-color-dot" style="background:${color}"></span>${name}</span>
+        </div>`
+      ).join('');
+    }
+  }
+}
 
 // SI config controls
 document.getElementById('si-difficulty').addEventListener('change', (e) => {
