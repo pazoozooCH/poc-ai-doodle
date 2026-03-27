@@ -31,24 +31,24 @@
     .ttt-board {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
-      max-width: 320px;
+      gap: 4px;
+      max-width: 220px;
       margin: 0 auto;
       padding: 10px;
     }
     .ttt-cell {
       aspect-ratio: 1;
       background: #16213e;
-      border-radius: 10px;
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 4px;
-      font-size: 0.8rem;
+      gap: 2px;
+      font-size: 0.65rem;
       font-weight: 600;
       color: #ccc;
-      border: 3px solid #333;
+      border: 2px solid #333;
       transition: border-color 0.3s, background 0.3s, transform 0.2s;
       position: relative;
       overflow: hidden;
@@ -61,7 +61,7 @@
       text-shadow: 0 1px 3px rgba(0,0,0,0.8);
     }
     .ttt-cell .ttt-cell-owner {
-      font-size: 0.65rem;
+      font-size: 0.55rem;
       z-index: 1;
       text-shadow: 0 1px 3px rgba(0,0,0,0.8);
     }
@@ -202,11 +202,7 @@
 
     <div id="ttt-winner-banner" class="ttt-winner-banner" style="display:none"></div>
 
-    <div class="ttt-board" id="ttt-board"></div>
-
     <div id="ttt-feedback" class="si-feedback"></div>
-
-    <div style="padding:10px;text-align:center;color:#888;font-size:0.85rem">Draw a doodle to claim a square!</div>
 
     <div class="canvas-wrapper">
       <canvas id="ttt-canvas" width="280" height="280"></canvas>
@@ -218,6 +214,8 @@
       <button id="ttt-claim" style="padding:10px 30px;border:none;border-radius:12px;background:#e94560;color:#fff;font-weight:600;cursor:pointer;font-size:1.1rem">Claim!</button>
       <button class="btn-clear" id="ttt-clear">Clear</button>
     </div>
+
+    <div class="ttt-board" id="ttt-board"></div>
   </div>
 
   <div id="game-over" class="game-over" style="display:none">
